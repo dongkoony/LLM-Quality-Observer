@@ -1,6 +1,6 @@
 # LLM-Quality-Observer
 
-[🇰🇷 KR](README.md) | [🇺🇸 EN](docs\README-main-us.md)
+[🇰🇷 KR](README.md) | [🇺🇸 EN](docs/README-main-us.md)
 
 ---
 
@@ -202,7 +202,7 @@ DATABASE_URL=postgresql://llm_user:llm_password@postgres:5432/llm_quality
 #### 1. 리포지토리 클론
 
 ```bash
-git clone https://github.com/<your-username>/LLM-Quality-Observer.git
+git clone https://github.com/dongkoony/LLM-Quality-Observer.git
 cd LLM-Quality-Observer
 ```
 

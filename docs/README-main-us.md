@@ -1,6 +1,6 @@
 # LLM-Quality-Observer
 
-[🇰🇷 KR](../README.md) | [🇺🇸 EN](docs\README-main-us.md)
+[🇰🇷 KR](../README.md) | [🇺🇸 EN](docs/README-main-us.md)
 
 ---
 
