@@ -1,0 +1,55 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: llm-postgres
+    environment:
+      POSTGRES_DB: llm_quality
+      POSTGRES_USER: llm_user
+      POSTGRES_PASSWORD: llm_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  gateway-api:
+    build: ../../services/gateway-api
+    container_name: llm-gateway-api
+    depends_on:
+      - postgres
+    env_file:
+      - ../../configs/env/.env.local
+    environment:
+      DATABASE_URL: postgresql://llm_user:llm_password@postgres:5432/llm_quality
+    ports:
+      - "18000:8000"
+
+  evaluator:
+    build: ../../services/evaluator
+    container_name: llm-evaluator
+    depends_on:
+      - postgres
+    env_file:
+      - ../../configs/env/.env.local
+    environment:
+      DATABASE_URL: postgresql://llm_user:llm_password@postgres:5432/llm_quality
+    ports:
+      - "18001:8000"
+
+
+
+  dashboard:
+    build: ../../services/dashboard
+    container_name: llm-dashboard
+    depends_on:
+      - postgres
+    env_file:
+      - ../../configs/env/.env.local
+    environment:
+      DATABASE_URL: postgresql://llm_user:llm_password@postgres:5432/llm_quality
+    ports:
+      - "8501:8501"
+
+volumes:
+  postgres_data:
