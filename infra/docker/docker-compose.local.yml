@@ -40,7 +40,7 @@ services:
 
 
   dashboard:
-    build: ../../services/dashboard
+    build: ../../services/dashboard/app
     container_name: llm-dashboard
     depends_on:
       - postgres
@@ -49,7 +49,7 @@ services:
     environment:
       DATABASE_URL: postgresql://llm_user:llm_password@postgres:5432/llm_quality
     ports:
-      - "8501:8501"
+      - "18002:8000"
 
 volumes:
   postgres_data:
