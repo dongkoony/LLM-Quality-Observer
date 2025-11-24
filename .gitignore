@@ -30,3 +30,4 @@ configs/env/.env.local
 
 # Claude
 CLAUDE.md
+.claude/settings.local.json
