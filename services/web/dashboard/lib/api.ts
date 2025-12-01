@@ -3,6 +3,7 @@ import type {
   LogListResponse,
   EvaluationListResponse,
   ModelStatsResponse,
+  TimeSeriesResponse,
 } from "./types"
 
 const API_BASE_URL =
@@ -54,4 +55,11 @@ export async function getEvaluations(
  */
 export async function getModelStats(): Promise<ModelStatsResponse> {
   return fetchAPI<ModelStatsResponse>("/api/dashboard/models/stats")
+}
+
+/**
+ * Get time series data
+ */
+export async function getTimeSeries(days: number = 7): Promise<TimeSeriesResponse> {
+  return fetchAPI<TimeSeriesResponse>(`/api/dashboard/timeseries?days=${days}`)
 }

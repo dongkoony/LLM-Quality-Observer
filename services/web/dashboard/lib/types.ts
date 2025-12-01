@@ -59,3 +59,15 @@ export interface ModelStats {
 export interface ModelStatsResponse {
   models: ModelStats[]
 }
+
+export interface TimeSeriesDataPoint {
+  date: string // YYYY-MM-DD format
+  avg_score: number | null
+  avg_latency_ms: number | null
+  total_requests: number
+  total_evaluated: number
+}
+
+export interface TimeSeriesResponse {
+  data: TimeSeriesDataPoint[]
+}

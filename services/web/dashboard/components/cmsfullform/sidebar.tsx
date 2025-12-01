@@ -15,6 +15,7 @@ import {
 import Link from "next/link"
 import { useState, useEffect } from "react"
 import { cn } from "@/lib/utils"
+import { useTranslations } from "@/lib/use-translations"
 
 type MenuState = "full" | "collapsed" | "hidden"
 
@@ -44,58 +45,59 @@ interface MenuSection {
   items: MenuItem[]
 }
 
-const menuData: MenuSection[] = [
-  {
-    id: "main",
-    label: "Main",
-    items: [
-      {
-        id: "overview",
-        label: "Overview",
-        href: "/",
-        icon: Home,
-      },
-      {
-        id: "logs",
-        label: "Logs",
-        href: "/logs",
-        icon: FileText,
-      },
-      {
-        id: "evaluations",
-        label: "Evaluations",
-        href: "/evaluations",
-        icon: CheckSquare,
-      },
-      {
-        id: "models",
-        label: "Models",
-        href: "/models",
-        icon: Cpu,
-      },
-    ],
-  },
-  {
-    id: "info",
-    label: "Information",
-    items: [
-      {
-        id: "about",
-        label: "About",
-        href: "/about",
-        icon: Info,
-      },
-    ],
-  },
-]
-
 export default function Sidebar() {
+  const t = useTranslations()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [menuState, setMenuState] = useState<MenuState>("full")
   const [isHovered, setIsHovered] = useState(false)
   const [previousDesktopState, setPreviousDesktopState] = useState<MenuState>("full")
   const [isMobile, setIsMobile] = useState(false)
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
+
+  const menuData: MenuSection[] = [
+    {
+      id: "main",
+      label: "Main",
+      items: [
+        {
+          id: "overview",
+          label: t.nav.overview,
+          href: "/",
+          icon: Home,
+        },
+        {
+          id: "logs",
+          label: t.nav.logs,
+          href: "/logs",
+          icon: FileText,
+        },
+        {
+          id: "evaluations",
+          label: t.nav.evaluations,
+          href: "/evaluations",
+          icon: CheckSquare,
+        },
+        {
+          id: "models",
+          label: t.nav.models,
+          href: "/models",
+          icon: Cpu,
+        },
+      ],
+    },
+    {
+      id: "info",
+      label: "Information",
+      items: [
+        {
+          id: "about",
+          label: "About",
+          href: "/about",
+          icon: Info,
+        },
+      ],
+    },
+  ]
 
   // Cycle through menu states: full -> collapsed -> hidden -> full
   const toggleMenuState = () => {
