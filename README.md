@@ -20,16 +20,20 @@
 ### v0.2.0 주요 기능
 
 🎉 **새로운 기능**:
-- **웹 대시보드** (Next.js 14 + Tailwind CSS)
-  - Overview: 전체 통계 (총 로그 수, 평가된 수, 평균 지연시간, 평균 점수)
+- **웹 대시보드** (Next.js 14 + Tailwind CSS + Recharts)
+  - Overview: 전체 통계 카드 + 모델 성능 차트 + 최근 활동
+    - 총 로그 수, 평가된 수, 평균 지연시간, 평균 점수
+    - 모델별 평균 점수 바 차트
+    - 모델별 평균 지연시간 바 차트
+    - 최근 5개 로그 활동 미리보기
   - Logs: LLM 로그 목록 조회 (페이지네이션 지원)
   - Evaluations: 평가 결과 목록 조회 (점수별 색상 구분)
-  - Models: 모델별 성능 비교
+  - Models: 모델별 성능 비교 테이블 + 요약 카드
 - **Evaluator 서비스**: 룰 기반 품질 평가
 - **Dashboard API**: 읽기 전용 API 엔드포인트 추가
   - GET `/api/dashboard/summary` - 전체 통계
-  - GET `/api/dashboard/logs` - 로그 목록
-  - GET `/api/dashboard/evaluations` - 평가 목록
+  - GET `/api/dashboard/logs` - 로그 목록 (페이지네이션)
+  - GET `/api/dashboard/evaluations` - 평가 목록 (페이지네이션)
   - GET `/api/dashboard/models/stats` - 모델 통계
 
 ---
