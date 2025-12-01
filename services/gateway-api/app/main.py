@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, Query
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import func, select, distinct
 import math
@@ -23,6 +24,15 @@ from .config import settings
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="LLM Quality Observer - Gateway API")
+
+# CORS 설정 추가 (웹 대시보드에서 API 호출을 위해 필요)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # Next.js dev server
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/health")
