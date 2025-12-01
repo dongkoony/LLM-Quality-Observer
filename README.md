@@ -7,15 +7,30 @@
 
 ### 개요
 
-**LLM-Quality-Observer** 는 대형 언어 모델(LLM)의 응답 품질을 **모니터링하고 평가**하기 위한 개인 MLOps 포트폴리오 프로젝트입니다.  
+**LLM-Quality-Observer** 는 대형 언어 모델(LLM)의 응답 품질을 **모니터링하고 평가**하기 위한 개인 MLOps 포트폴리오 프로젝트입니다.
 이 프로젝트의 목표는 다음과 같습니다.
 
-- LLM 기반 **Gateway API** 구성
-- 프롬프트 / 응답 / 지연 시간(latency) / 모델 버전 등을 **DB에 로깅**
-- (향후) 평가 서비스(Evaluator)로 품질 점수 계산
-- (향후) 대시보드에서 품질/지연/에러율 등 **지표 시각화**
+- LLM 기반 **Gateway API** 구성 ✅
+- 프롬프트 / 응답 / 지연 시간(latency) / 모델 버전 등을 **DB에 로깅** ✅
+- 평가 서비스(Evaluator)로 품질 점수 계산 ✅
+- 대시보드에서 품질/지연/에러율 등 **지표 시각화** ✅
 
-> 현재 상태: **v1 — Gateway API + Postgres 로깅까지 동작**
+> 현재 상태: **v0.2.0 — 웹 대시보드 + 평가 서비스 추가 완료**
+
+### v0.2.0 주요 기능
+
+🎉 **새로운 기능**:
+- **웹 대시보드** (Next.js 14 + Tailwind CSS)
+  - Overview: 전체 통계 (총 로그 수, 평가된 수, 평균 지연시간, 평균 점수)
+  - Logs: LLM 로그 목록 조회 (페이지네이션 지원)
+  - Evaluations: 평가 결과 목록 조회 (점수별 색상 구분)
+  - Models: 모델별 성능 비교
+- **Evaluator 서비스**: 룰 기반 품질 평가
+- **Dashboard API**: 읽기 전용 API 엔드포인트 추가
+  - GET `/api/dashboard/summary` - 전체 통계
+  - GET `/api/dashboard/logs` - 로그 목록
+  - GET `/api/dashboard/evaluations` - 평가 목록
+  - GET `/api/dashboard/models/stats` - 모델 통계
 
 ---
 
