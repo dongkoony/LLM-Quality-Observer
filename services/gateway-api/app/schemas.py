@@ -103,3 +103,17 @@ class ModelStats(BaseModel):
 class ModelStatsResponse(BaseModel):
     """모델 통계 목록"""
     models: list[ModelStats]
+
+
+class TimeSeriesDataPoint(BaseModel):
+    """시간별 데이터 포인트"""
+    date: str  # YYYY-MM-DD 형식
+    avg_score: float | None
+    avg_latency_ms: float | None
+    total_requests: int
+    total_evaluated: int
+
+
+class TimeSeriesResponse(BaseModel):
+    """시간별 추이 데이터"""
+    data: list[TimeSeriesDataPoint]

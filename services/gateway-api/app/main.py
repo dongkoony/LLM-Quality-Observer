@@ -16,6 +16,8 @@ from .schemas import (
     EvaluationRead,
     ModelStatsResponse,
     ModelStats,
+    TimeSeriesResponse,
+    TimeSeriesDataPoint,
 )
 from .llm_client import call_llm
 from .config import settings
@@ -242,3 +244,73 @@ def get_model_stats(db: Session = Depends(get_db)):
         )
 
     return ModelStatsResponse(models=models)
+
+
+@app.get("/api/dashboard/timeseries", response_model=TimeSeriesResponse)
+def get_timeseries(
+    days: int = Query(7, ge=1, le=30, description="조회할 일수 (1-30일)"),
+    db: Session = Depends(get_db),
+):
+    """
+    시간별 추이 데이터 조회.
+    최근 N일간의 일별 통계를 반환.
+    """
+    from datetime import datetime, timedelta
+    from sqlalchemy import cast, Date
+
+    # 시작 날짜 계산 (N일 전부터)
+    start_date = datetime.now() - timedelta(days=days)
+
+    # 날짜별 로그 통계
+    log_stats = (
+        db.query(
+            cast(LLMLog.created_at, Date).label("date"),
+            func.count(LLMLog.id).label("total_requests"),
+            func.avg(LLMLog.latency_ms).label("avg_latency_ms"),
+        )
+        .filter(LLMLog.created_at >= start_date)
+        .group_by(cast(LLMLog.created_at, Date))
+        .order_by(cast(LLMLog.created_at, Date))
+        .all()
+    )
+
+    # 날짜별 평가 통계
+    eval_stats_query = (
+        db.query(
+            cast(LLMLog.created_at, Date).label("date"),
+            func.count(distinct(LLMEvaluation.log_id)).label("total_evaluated"),
+            func.avg(LLMEvaluation.overall_score).label("avg_score"),
+        )
+        .join(LLMEvaluation, LLMLog.id == LLMEvaluation.log_id)
+        .filter(LLMLog.created_at >= start_date)
+        .group_by(cast(LLMLog.created_at, Date))
+        .order_by(cast(LLMLog.created_at, Date))
+        .all()
+    )
+
+    # 평가 통계를 딕셔너리로 변환
+    eval_stats_dict = {
+        str(row.date): {
+            "total_evaluated": row.total_evaluated or 0,
+            "avg_score": row.avg_score,
+        }
+        for row in eval_stats_query
+    }
+
+    # 결과 조합
+    data_points = []
+    for row in log_stats:
+        date_str = str(row.date)
+        eval_data = eval_stats_dict.get(date_str, {"total_evaluated": 0, "avg_score": None})
+
+        data_points.append(
+            TimeSeriesDataPoint(
+                date=date_str,
+                avg_score=eval_data["avg_score"],
+                avg_latency_ms=row.avg_latency_ms,
+                total_requests=row.total_requests,
+                total_evaluated=eval_data["total_evaluated"],
+            )
+        )
+
+    return TimeSeriesResponse(data=data_points)
