@@ -64,8 +64,11 @@ export const ja: Translations = {
     prompt: "プロンプト",
     response: "レスポンス",
     score: "スコア",
+    scoreInstruction: "指示遵守",
+    scoreTruthfulness: "正確性",
     label: "ラベル",
     judge: "評価者",
+    judgeType: "評価方式",
     comment: "コメント",
     showing: "表示中",
     of: "/",
@@ -73,6 +76,8 @@ export const ja: Translations = {
     previous: "前へ",
     next: "次へ",
     noEvaluations: "評価が見つかりません",
+    ruleBased: "ルールベース",
+    llmBased: "LLM評価",
   },
 
   // Models page

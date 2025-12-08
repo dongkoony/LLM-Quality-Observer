@@ -54,6 +54,18 @@ export default function EvaluationsContent() {
     return "bg-red-100 text-red-800"
   }
 
+  const getJudgeTypeBadge = (judgeModel: string) => {
+    const isLLMJudge = judgeModel && !judgeModel.includes("rule")
+    return isLLMJudge
+      ? "bg-blue-100 text-blue-800"
+      : "bg-gray-100 text-gray-800"
+  }
+
+  const getJudgeTypeLabel = (judgeModel: string) => {
+    const isLLMJudge = judgeModel && !judgeModel.includes("rule")
+    return isLLMJudge ? t.evaluations.llmBased : t.evaluations.ruleBased
+  }
+
   return (
     <div className="space-y-4">
       <div>
@@ -94,9 +106,10 @@ export default function EvaluationsContent() {
                       <TableHead className="w-[80px]">{t.evaluations.logId}</TableHead>
                       <TableHead>{t.evaluations.prompt}</TableHead>
                       <TableHead>{t.evaluations.response}</TableHead>
+                      <TableHead className="w-[100px]">{t.evaluations.judgeType}</TableHead>
                       <TableHead className="w-[80px]">{t.evaluations.score}</TableHead>
-                      <TableHead className="w-[80px]">{t.evaluations.label}</TableHead>
-                      <TableHead className="w-[100px]">{t.evaluations.judge}</TableHead>
+                      <TableHead className="w-[90px]">{t.evaluations.scoreInstruction}</TableHead>
+                      <TableHead className="w-[90px]">{t.evaluations.scoreTruthfulness}</TableHead>
                       <TableHead>{t.evaluations.comment}</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -109,12 +122,33 @@ export default function EvaluationsContent() {
                         <TableCell className="text-xs">{truncateText(evaluation.log_prompt || t.common.na, 60)}</TableCell>
                         <TableCell className="text-xs">{truncateText(evaluation.log_response || t.common.na, 60)}</TableCell>
                         <TableCell>
+                          <span className={`text-xs px-2 py-1 rounded font-medium ${getJudgeTypeBadge(evaluation.judge_model)}`}>
+                            {getJudgeTypeLabel(evaluation.judge_model)}
+                          </span>
+                        </TableCell>
+                        <TableCell>
                           <span className={`text-xs px-2 py-1 rounded ${getScoreColor(evaluation.overall_score)}`}>
                             {evaluation.overall_score}/5
                           </span>
                         </TableCell>
-                        <TableCell className="text-xs">{evaluation.label}</TableCell>
-                        <TableCell className="text-xs">{evaluation.judge_model}</TableCell>
+                        <TableCell className="text-center">
+                          {evaluation.score_instruction_following !== null ? (
+                            <span className={`text-xs px-2 py-1 rounded ${getScoreColor(evaluation.score_instruction_following)}`}>
+                              {evaluation.score_instruction_following}/5
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">{t.common.na}</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {evaluation.score_truthfulness !== null ? (
+                            <span className={`text-xs px-2 py-1 rounded ${getScoreColor(evaluation.score_truthfulness)}`}>
+                              {evaluation.score_truthfulness}/5
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">{t.common.na}</span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-xs">{truncateText(evaluation.comment || t.common.na, 50)}</TableCell>
                       </TableRow>
                     ))}

@@ -31,10 +31,13 @@ export interface EvaluationItem {
   created_at: string
   log_id: number
   overall_score: number
+  score_instruction_following: number | null
+  score_truthfulness: number | null
   is_flagged: boolean
   label: string
   judge_model: string
   comment: string | null
+  raw_judge_response: string | null
   log_prompt: string | null
   log_response: string | null
   log_model_version: string | null
