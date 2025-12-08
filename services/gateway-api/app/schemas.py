@@ -69,10 +69,13 @@ class EvaluationRead(BaseModel):
     created_at: datetime
     log_id: int
     overall_score: int
+    score_instruction_following: int | None = None
+    score_truthfulness: int | None = None
     is_flagged: bool
     label: str
     judge_model: str
     comment: str | None
+    raw_judge_response: str | None = None
     # 로그 정보도 함께 포함
     log_prompt: str | None = None
     log_response: str | None = None
