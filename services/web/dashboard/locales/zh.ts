@@ -64,8 +64,11 @@ export const zh: Translations = {
     prompt: "提示",
     response: "响应",
     score: "分数",
+    scoreInstruction: "指令遵守",
+    scoreTruthfulness: "真实性",
     label: "标签",
     judge: "评审员",
+    judgeType: "评估方式",
     comment: "评论",
     showing: "显示",
     of: "/",
@@ -73,6 +76,8 @@ export const zh: Translations = {
     previous: "上一页",
     next: "下一页",
     noEvaluations: "未找到评估",
+    ruleBased: "基于规则",
+    llmBased: "LLM评审",
   },
 
   // Models page

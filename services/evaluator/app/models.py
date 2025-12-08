@@ -65,17 +65,24 @@ class LLMEvaluation(Base):
     # 평가 점수 (1~5 스케일)
     overall_score = Column(Integer, nullable=False)
 
+    # LLM-as-a-Judge 세부 점수 (옵션널)
+    score_instruction_following = Column(Integer, nullable=True)
+    score_truthfulness = Column(Integer, nullable=True)
+
     # 문제가 있는 응답인지 (예: 에러 메시지, 너무 짧음 등)
     is_flagged = Column(Boolean, nullable=False, default=False)
 
     # 평가 라벨 (예: "ok", "too_short", "error_like" 등)
     label = Column(String(64), nullable=False)
 
-    # 어떤 judge 모델/룰로 평가했는지 (예: "rule-basic-v1", "gpt-5-mini")
+    # 어떤 judge 모델/룰로 평가했는지 (예: "rule-basic-v1", "gpt-4o-mini" 등)
     judge_model = Column(String(128), nullable=False, default="rule-basic-v1")
 
     # 평가 근거 또는 코멘트
     comment = Column(Text, nullable=True)
+
+    # LLM judge의 원본 응답 (디버깅용, 옵션널)
+    raw_judge_response = Column(Text, nullable=True)
 
     # N:1 관계 (여러 평가가 한 로그를 참조)
     log = relationship("LLMLog", back_populates="evaluations")

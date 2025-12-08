@@ -13,8 +13,10 @@ import {
 import { Button } from "@/components/ui/button"
 import { getEvaluations } from "@/lib/api"
 import type { EvaluationListResponse } from "@/lib/types"
+import { useTranslations } from "@/lib/use-translations"
 
 export default function EvaluationsContent() {
+  const t = useTranslations()
   const [evaluationsData, setEvaluationsData] = useState<EvaluationListResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -52,19 +54,31 @@ export default function EvaluationsContent() {
     return "bg-red-100 text-red-800"
   }
 
+  const getJudgeTypeBadge = (judgeModel: string) => {
+    const isLLMJudge = judgeModel && !judgeModel.includes("rule")
+    return isLLMJudge
+      ? "bg-blue-100 text-blue-800"
+      : "bg-gray-100 text-gray-800"
+  }
+
+  const getJudgeTypeLabel = (judgeModel: string) => {
+    const isLLMJudge = judgeModel && !judgeModel.includes("rule")
+    return isLLMJudge ? t.evaluations.llmBased : t.evaluations.ruleBased
+  }
+
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Evaluations</h1>
+        <h1 className="text-3xl font-bold tracking-tight">{t.evaluations.title}</h1>
         <p className="text-muted-foreground">
-          View LLM evaluation results and quality scores
+          {t.evaluations.subtitle}
         </p>
       </div>
 
       {error && (
         <Card className="border-red-500">
           <CardContent className="pt-6">
-            <p className="text-sm text-red-500">Error: {error}</p>
+            <p className="text-sm text-red-500">{t.common.error} {error}</p>
           </CardContent>
         </Card>
       )}
@@ -72,30 +86,31 @@ export default function EvaluationsContent() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Quality Evaluations</CardTitle>
+            <CardTitle>{t.evaluations.tableTitle}</CardTitle>
             <div className="text-sm text-muted-foreground">
-              {evaluationsData && `Total: ${evaluationsData.total} evaluations | Page ${evaluationsData.page} of ${evaluationsData.total_pages}`}
+              {evaluationsData && `${t.evaluations.total} ${evaluationsData.total} ${t.evaluations.evaluationsText} | ${t.logs.page} ${evaluationsData.page} ${t.logs.of} ${evaluationsData.total_pages}`}
             </div>
           </div>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="text-center py-8">Loading...</div>
+            <div className="text-center py-8">{t.common.loading}</div>
           ) : evaluationsData && evaluationsData.evaluations.length > 0 ? (
             <div className="space-y-4">
               <div className="rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[60px]">ID</TableHead>
-                      <TableHead className="w-[140px]">Created At</TableHead>
-                      <TableHead className="w-[80px]">Log ID</TableHead>
-                      <TableHead>Prompt</TableHead>
-                      <TableHead>Response</TableHead>
-                      <TableHead className="w-[80px]">Score</TableHead>
-                      <TableHead className="w-[80px]">Label</TableHead>
-                      <TableHead className="w-[100px]">Judge</TableHead>
-                      <TableHead>Comment</TableHead>
+                      <TableHead className="w-[60px]">{t.evaluations.id}</TableHead>
+                      <TableHead className="w-[140px]">{t.evaluations.createdAt}</TableHead>
+                      <TableHead className="w-[80px]">{t.evaluations.logId}</TableHead>
+                      <TableHead>{t.evaluations.prompt}</TableHead>
+                      <TableHead>{t.evaluations.response}</TableHead>
+                      <TableHead className="w-[100px]">{t.evaluations.judgeType}</TableHead>
+                      <TableHead className="w-[80px]">{t.evaluations.score}</TableHead>
+                      <TableHead className="w-[90px]">{t.evaluations.scoreInstruction}</TableHead>
+                      <TableHead className="w-[90px]">{t.evaluations.scoreTruthfulness}</TableHead>
+                      <TableHead>{t.evaluations.comment}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -104,16 +119,37 @@ export default function EvaluationsContent() {
                         <TableCell className="font-medium">{evaluation.id}</TableCell>
                         <TableCell className="text-xs">{formatDate(evaluation.created_at)}</TableCell>
                         <TableCell className="text-xs">{evaluation.log_id}</TableCell>
-                        <TableCell className="text-xs">{truncateText(evaluation.log_prompt || "N/A", 60)}</TableCell>
-                        <TableCell className="text-xs">{truncateText(evaluation.log_response || "N/A", 60)}</TableCell>
+                        <TableCell className="text-xs">{truncateText(evaluation.log_prompt || t.common.na, 60)}</TableCell>
+                        <TableCell className="text-xs">{truncateText(evaluation.log_response || t.common.na, 60)}</TableCell>
+                        <TableCell>
+                          <span className={`text-xs px-2 py-1 rounded font-medium ${getJudgeTypeBadge(evaluation.judge_model)}`}>
+                            {getJudgeTypeLabel(evaluation.judge_model)}
+                          </span>
+                        </TableCell>
                         <TableCell>
                           <span className={`text-xs px-2 py-1 rounded ${getScoreColor(evaluation.overall_score)}`}>
                             {evaluation.overall_score}/5
                           </span>
                         </TableCell>
-                        <TableCell className="text-xs">{evaluation.label}</TableCell>
-                        <TableCell className="text-xs">{evaluation.judge_model}</TableCell>
-                        <TableCell className="text-xs">{truncateText(evaluation.comment || "N/A", 50)}</TableCell>
+                        <TableCell className="text-center">
+                          {evaluation.score_instruction_following !== null ? (
+                            <span className={`text-xs px-2 py-1 rounded ${getScoreColor(evaluation.score_instruction_following)}`}>
+                              {evaluation.score_instruction_following}/5
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">{t.common.na}</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {evaluation.score_truthfulness !== null ? (
+                            <span className={`text-xs px-2 py-1 rounded ${getScoreColor(evaluation.score_truthfulness)}`}>
+                              {evaluation.score_truthfulness}/5
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">{t.common.na}</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs">{truncateText(evaluation.comment || t.common.na, 50)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -122,7 +158,7 @@ export default function EvaluationsContent() {
 
               <div className="flex items-center justify-between">
                 <div className="text-sm text-muted-foreground">
-                  Showing {evaluationsData.evaluations.length} of {evaluationsData.total} evaluations
+                  {t.evaluations.showing} {evaluationsData.evaluations.length} {t.evaluations.of} {evaluationsData.total} {t.evaluations.evaluationsText}
                 </div>
                 <div className="flex gap-2">
                   <Button
@@ -131,7 +167,7 @@ export default function EvaluationsContent() {
                     onClick={() => setCurrentPage(currentPage - 1)}
                     disabled={currentPage <= 1}
                   >
-                    Previous
+                    {t.evaluations.previous}
                   </Button>
                   <Button
                     variant="outline"
@@ -139,14 +175,14 @@ export default function EvaluationsContent() {
                     onClick={() => setCurrentPage(currentPage + 1)}
                     disabled={currentPage >= evaluationsData.total_pages}
                   >
-                    Next
+                    {t.evaluations.next}
                   </Button>
                 </div>
               </div>
             </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
-              No evaluations found
+              {t.evaluations.noEvaluations}
             </div>
           )}
         </CardContent>

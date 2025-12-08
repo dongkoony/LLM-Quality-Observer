@@ -62,8 +62,11 @@ export const en = {
     prompt: "Prompt",
     response: "Response",
     score: "Score",
+    scoreInstruction: "Instruction",
+    scoreTruthfulness: "Truthfulness",
     label: "Label",
     judge: "Judge",
+    judgeType: "Judge Type",
     comment: "Comment",
     showing: "Showing",
     of: "of",
@@ -71,6 +74,8 @@ export const en = {
     previous: "Previous",
     next: "Next",
     noEvaluations: "No evaluations found",
+    ruleBased: "Rule-Based",
+    llmBased: "LLM Judge",
   },
 
   // Models page

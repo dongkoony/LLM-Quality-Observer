@@ -12,8 +12,10 @@ import {
 } from "@/components/ui/table"
 import { getModelStats } from "@/lib/api"
 import type { ModelStatsResponse } from "@/lib/types"
+import { useTranslations } from "@/lib/use-translations"
 
 export default function ModelsContent() {
+  const t = useTranslations()
   const [modelStats, setModelStats] = useState<ModelStatsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -35,13 +37,13 @@ export default function ModelsContent() {
   }, [])
 
   const formatLatency = (ms: number | null) => {
-    if (ms === null) return "N/A"
+    if (ms === null) return t.common.na
     if (ms < 1000) return `${Math.round(ms)}ms`
     return `${(ms / 1000).toFixed(2)}s`
   }
 
   const formatScore = (score: number | null) => {
-    if (score === null) return "N/A"
+    if (score === null) return t.common.na
     return score.toFixed(2)
   }
 
@@ -55,38 +57,38 @@ export default function ModelsContent() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Models</h1>
+        <h1 className="text-3xl font-bold tracking-tight">{t.models.title}</h1>
         <p className="text-muted-foreground">
-          Compare performance metrics across different LLM models
+          {t.models.subtitle}
         </p>
       </div>
 
       {error && (
         <Card className="border-red-500">
           <CardContent className="pt-6">
-            <p className="text-sm text-red-500">Error: {error}</p>
+            <p className="text-sm text-red-500">{t.common.error} {error}</p>
           </CardContent>
         </Card>
       )}
 
       <Card>
         <CardHeader>
-          <CardTitle>Model Performance Comparison</CardTitle>
+          <CardTitle>{t.models.tableTitle}</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="text-center py-8">Loading...</div>
+            <div className="text-center py-8">{t.common.loading}</div>
           ) : modelStats && modelStats.models.length > 0 ? (
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Model Version</TableHead>
-                    <TableHead className="text-right">Total Requests</TableHead>
-                    <TableHead className="text-right">Evaluated</TableHead>
-                    <TableHead className="text-right">Avg Latency</TableHead>
-                    <TableHead className="text-right">Avg Score</TableHead>
-                    <TableHead className="text-right">Evaluation Rate</TableHead>
+                    <TableHead>{t.models.modelVersion}</TableHead>
+                    <TableHead className="text-right">{t.models.totalRequests}</TableHead>
+                    <TableHead className="text-right">{t.models.evaluatedCount}</TableHead>
+                    <TableHead className="text-right">{t.models.avgLatency}</TableHead>
+                    <TableHead className="text-right">{t.models.avgScore}</TableHead>
+                    <TableHead className="text-right">{t.models.evaluationRate}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -113,7 +115,7 @@ export default function ModelsContent() {
             </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
-              No model data found
+              {t.models.noModels}
             </div>
           )}
         </CardContent>
@@ -123,40 +125,40 @@ export default function ModelsContent() {
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Models</CardTitle>
+              <CardTitle className="text-sm font-medium">{t.models.totalModels}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{modelStats.models.length}</div>
               <p className="text-xs text-muted-foreground">
-                Different models tracked
+                {t.models.totalModelsDesc}
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Best Avg Score</CardTitle>
+              <CardTitle className="text-sm font-medium">{t.models.bestAvgScore}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
                 {Math.max(...modelStats.models.map(m => m.avg_score || 0)).toFixed(2)}
               </div>
               <p className="text-xs text-muted-foreground">
-                Highest quality rating
+                {t.models.bestAvgScoreDesc}
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Best Avg Latency</CardTitle>
+              <CardTitle className="text-sm font-medium">{t.models.bestAvgLatency}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
                 {formatLatency(Math.min(...modelStats.models.map(m => m.avg_latency_ms || Infinity)))}
               </div>
               <p className="text-xs text-muted-foreground">
-                Fastest response time
+                {t.models.bestAvgLatencyDesc}
               </p>
             </CardContent>
           </Card>

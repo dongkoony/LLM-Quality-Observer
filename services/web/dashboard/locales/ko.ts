@@ -64,8 +64,11 @@ export const ko: Translations = {
     prompt: "프롬프트",
     response: "응답",
     score: "점수",
+    scoreInstruction: "지시 준수",
+    scoreTruthfulness: "정확성",
     label: "레이블",
     judge: "평가자",
+    judgeType: "평가 방식",
     comment: "코멘트",
     showing: "표시 중",
     of: "/",
@@ -73,6 +76,8 @@ export const ko: Translations = {
     previous: "이전",
     next: "다음",
     noEvaluations: "평가가 없습니다",
+    ruleBased: "룰 기반",
+    llmBased: "LLM 평가",
   },
 
   // Models page

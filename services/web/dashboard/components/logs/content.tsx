@@ -13,8 +13,10 @@ import {
 import { Button } from "@/components/ui/button"
 import { getLogs } from "@/lib/api"
 import type { LogListResponse } from "@/lib/types"
+import { useTranslations } from "@/lib/use-translations"
 
 export default function LogsContent() {
+  const t = useTranslations()
   const [logsData, setLogsData] = useState<LogListResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -49,16 +51,16 @@ export default function LogsContent() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Logs</h1>
+        <h1 className="text-3xl font-bold tracking-tight">{t.logs.title}</h1>
         <p className="text-muted-foreground">
-          View and search LLM request/response logs
+          {t.logs.subtitle}
         </p>
       </div>
 
       {error && (
         <Card className="border-red-500">
           <CardContent className="pt-6">
-            <p className="text-sm text-red-500">Error: {error}</p>
+            <p className="text-sm text-red-500">{t.common.error} {error}</p>
           </CardContent>
         </Card>
       )}
@@ -66,29 +68,29 @@ export default function LogsContent() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>LLM Logs</CardTitle>
+            <CardTitle>{t.logs.tableTitle}</CardTitle>
             <div className="text-sm text-muted-foreground">
-              {logsData && `Total: ${logsData.total} logs | Page ${logsData.page} of ${logsData.total_pages}`}
+              {logsData && `${logsData.total} ${t.logs.logsText} | ${t.logs.page} ${logsData.page} ${t.logs.of} ${logsData.total_pages}`}
             </div>
           </div>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="text-center py-8">Loading...</div>
+            <div className="text-center py-8">{t.common.loading}</div>
           ) : logsData && logsData.logs.length > 0 ? (
             <div className="space-y-4">
               <div className="rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[80px]">ID</TableHead>
-                      <TableHead className="w-[180px]">Created At</TableHead>
-                      <TableHead className="w-[100px]">User ID</TableHead>
-                      <TableHead>Prompt</TableHead>
-                      <TableHead>Response</TableHead>
-                      <TableHead className="w-[120px]">Model</TableHead>
-                      <TableHead className="w-[100px]">Latency</TableHead>
-                      <TableHead className="w-[80px]">Status</TableHead>
+                      <TableHead className="w-[80px]">{t.logs.id}</TableHead>
+                      <TableHead className="w-[180px]">{t.logs.createdAt}</TableHead>
+                      <TableHead className="w-[100px]">{t.logs.userId}</TableHead>
+                      <TableHead>{t.logs.prompt}</TableHead>
+                      <TableHead>{t.logs.response}</TableHead>
+                      <TableHead className="w-[120px]">{t.logs.model}</TableHead>
+                      <TableHead className="w-[100px]">{t.logs.latency}</TableHead>
+                      <TableHead className="w-[80px]">{t.logs.status}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -96,12 +98,12 @@ export default function LogsContent() {
                       <TableRow key={log.id}>
                         <TableCell className="font-medium">{log.id}</TableCell>
                         <TableCell className="text-xs">{formatDate(log.created_at)}</TableCell>
-                        <TableCell className="text-xs">{log.user_id || "N/A"}</TableCell>
+                        <TableCell className="text-xs">{log.user_id || t.common.na}</TableCell>
                         <TableCell className="text-xs">{truncateText(log.prompt, 80)}</TableCell>
                         <TableCell className="text-xs">{truncateText(log.response, 80)}</TableCell>
-                        <TableCell className="text-xs">{log.model_version || "N/A"}</TableCell>
+                        <TableCell className="text-xs">{log.model_version || t.common.na}</TableCell>
                         <TableCell className="text-xs">
-                          {log.latency_ms ? `${(log.latency_ms / 1000).toFixed(2)}s` : "N/A"}
+                          {log.latency_ms ? `${(log.latency_ms / 1000).toFixed(2)}s` : t.common.na}
                         </TableCell>
                         <TableCell>
                           <span
@@ -122,7 +124,7 @@ export default function LogsContent() {
 
               <div className="flex items-center justify-between">
                 <div className="text-sm text-muted-foreground">
-                  Showing {logsData.logs.length} of {logsData.total} logs
+                  {t.logs.showing} {logsData.logs.length} {t.logs.of} {logsData.total} {t.logs.logsText}
                 </div>
                 <div className="flex gap-2">
                   <Button
@@ -131,7 +133,7 @@ export default function LogsContent() {
                     onClick={() => setCurrentPage(currentPage - 1)}
                     disabled={currentPage <= 1}
                   >
-                    Previous
+                    {t.logs.previous}
                   </Button>
                   <Button
                     variant="outline"
@@ -139,14 +141,14 @@ export default function LogsContent() {
                     onClick={() => setCurrentPage(currentPage + 1)}
                     disabled={currentPage >= logsData.total_pages}
                   >
-                    Next
+                    {t.logs.next}
                   </Button>
                 </div>
               </div>
             </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
-              No logs found
+              {t.logs.noLogs}
             </div>
           )}
         </CardContent>
