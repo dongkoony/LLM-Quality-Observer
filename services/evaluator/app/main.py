@@ -1,23 +1,48 @@
-from typing import List, Literal
+from typing import Literal
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+import logging
 
 from .db import Base, engine, get_db
 from .models import LLMLog, LLMEvaluation
 from .rules import basic_rule_evaluate
 from .llm_judge import run_judge
 from .config import settings
+from .scheduler import start_scheduler, stop_scheduler
+from .utils import get_pending_logs
+
+# 로깅 설정
+logging.basicConfig(
+    level=getattr(logging, settings.log_level.upper()),
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    FastAPI 앱의 수명 주기 관리.
+    시작 시 테이블 생성 및 스케줄러 시작, 종료 시 스케줄러 중지.
+    """
+    # Startup
+    logger.info("Starting Evaluator Service...")
+    Base.metadata.create_all(bind=engine)
+    start_scheduler()
+    yield
+    # Shutdown
+    logger.info("Stopping Evaluator Service...")
+    stop_scheduler()
+
 
 # FastAPI 앱 생성
 app = FastAPI(
     title="LLM Quality Observer - Evaluator Service",
     description="룰 기반 및 LLM-as-a-judge 방식으로 LLM 응답 품질을 평가하는 서비스",
     version="1.0.0",
+    lifespan=lifespan,
 )
-
-# 앱 시작 시 테이블 생성
-Base.metadata.create_all(bind=engine)
 
 
 @app.get("/health")
@@ -124,38 +149,3 @@ def evaluate_once(
         "judge_type": judge_type,
         "judge_model": judge_model_name,
     }
-
-
-def get_pending_logs(db: Session, limit: int = 10) -> List[LLMLog]:
-    """
-    아직 평가되지 않은 LLM 로그들을 가져오는 함수.
-
-    조건:
-    - status가 "success"인 로그만 (에러 로그는 제외)
-    - llm_evaluations 테이블에 해당 log_id가 없는 로그만
-    - created_at 오름차순 정렬 (오래된 것부터)
-    - 최대 limit 개까지
-
-    Args:
-        db: SQLAlchemy 세션
-        limit: 가져올 최대 개수
-
-    Returns:
-        List[LLMLog]: 평가 대기 중인 로그 리스트
-    """
-    # 이미 평가된 log_id 서브쿼리
-    evaluated_log_ids_subquery = select(LLMEvaluation.log_id).subquery()
-
-    # 아직 평가되지 않은 로그 조회
-    stmt = (
-        select(LLMLog)
-        .where(LLMLog.status == "success")  # 성공한 로그만
-        .where(LLMLog.id.notin_(evaluated_log_ids_subquery))  # 평가 안 된 것만
-        .order_by(LLMLog.created_at.asc())  # 오래된 것부터
-        .limit(limit)
-    )
-
-    result = db.execute(stmt)
-    pending_logs = result.scalars().all()
-
-    return list(pending_logs)
