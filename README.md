@@ -4,349 +4,589 @@
 
 ---
 
+## 개요
 
-### 개요
+**LLM-Quality-Observer**는 대형 언어 모델(LLM)의 응답 품질을 **모니터링하고 평가**하기 위한 MLOps 플랫폼입니다.
+마이크로서비스 아키텍처 기반으로 구축되어 LLM 상호작용을 로깅하고, 자동으로 품질을 평가하며, 실시간 모니터링 대시보드를 제공합니다.
 
-**LLM-Quality-Observer** 는 대형 언어 모델(LLM)의 응답 품질을 **모니터링하고 평가**하기 위한 개인 MLOps 포트폴리오 프로젝트입니다.
-이 프로젝트의 목표는 다음과 같습니다.
+### 주요 기능
 
-- LLM 기반 **Gateway API** 구성 ✅
-- 프롬프트 / 응답 / 지연 시간(latency) / 모델 버전 등을 **DB에 로깅** ✅
-- 평가 서비스(Evaluator)로 품질 점수 계산 ✅
-- 대시보드에서 품질/지연/에러율 등 **지표 시각화** ✅
+- ✅ **Gateway API**: LLM 요청 처리 및 자동 로깅
+- ✅ **자동 평가**: 규칙 기반 + LLM-as-a-Judge 이중 평가 시스템
+- ✅ **스케줄러**: 배치 평가 자동 실행 (APScheduler)
+- ✅ **다중 채널 알림**: Slack, Discord, Email 통합
+- ✅ **모니터링**: Prometheus 메트릭 수집 + Grafana 대시보드
+- ✅ **웹 대시보드**: Next.js 기반 실시간 품질 시각화
+- ✅ **다국어 지원**: 영어, 한국어, 일본어, 중국어
+- ✅ **CI/CD**: GitHub Actions 자동화 파이프라인
 
-> 현재 상태: **v0.2.0 — 웹 대시보드 + 평가 서비스 추가 완료**
-
-### v0.2.0 주요 기능
-
-🎉 **새로운 기능**:
-- **웹 대시보드** (Next.js 14 + Tailwind CSS + Recharts)
-  - **Overview**: 전체 통계 카드 + 시간별 추이 차트 + 최근 활동
-    - 총 로그 수, 평가된 수, 평균 지연시간, 평균 점수
-    - 품질 점수 추이 선 그래프 (최근 30일)
-    - 지연시간 추이 선 그래프 (최근 30일)
-    - 요청 수 추이 선 그래프 (최근 30일)
-    - 최근 5개 로그 활동 미리보기
-  - **Logs**: LLM 로그 목록 조회 (페이지네이션 지원)
-  - **Evaluations**: 평가 결과 목록 조회 (점수별 색상 구분)
-  - **Models**: 모델별 성능 비교 테이블 + 요약 카드
-- **다국어 지원** (i18n)
-  - 영어(EN), 한국어(KR), 일본어(JP), 중국어(CN) 4개 언어
-  - 우측 상단 언어 선택 드롭다운
-  - localStorage에 언어 설정 저장
-- **Evaluator 서비스**: 룰 기반 품질 평가
-- **Dashboard API**: 읽기 전용 API 엔드포인트
-  - GET `/api/dashboard/summary` - 전체 통계
-  - GET `/api/dashboard/logs` - 로그 목록 (페이지네이션)
-  - GET `/api/dashboard/evaluations` - 평가 목록 (페이지네이션)
-  - GET `/api/dashboard/models/stats` - 모델 통계
-  - GET `/api/dashboard/timeseries` - 시간별 추이 데이터 (1-30일)
+> **현재 버전: v0.5.0** — Prometheus, Grafana, 이메일 알림 추가 완료
 
 ---
 
-### 아키텍처 개요
-
-현재 v1 아키텍처:
+## 📊 아키텍처
 
 ```mermaid
-flowchart TD
-    C["Client (Swagger UI / HTTP)"]
-    G["Gateway API (FastAPI)"]
-    DB["Postgres (table: llm_logs)"]
-    E["Evaluator Service (future)"]
-    D["Dashboard Service (future)"]
+flowchart TB
+    subgraph "클라이언트"
+        ClientApp[Client/Browser]
+    end
 
-    C --> G
-    G -->|LLM call + latency + logging| DB
-    DB --> E
-    DB --> D
+    subgraph "프론트엔드"
+        WebDashboard["Next.js Dashboard<br/>:3000"]
+        Grafana["Grafana<br/>:3001"]
+    end
+
+    subgraph "백엔드 서비스"
+        Gateway["Gateway API<br/>:18000"]
+        Evaluator["Evaluator<br/>:18001"]
+        Dashboard["Streamlit Dashboard<br/>:18002"]
+    end
+
+    subgraph "데이터베이스"
+        Postgres["PostgreSQL<br/>:5432"]
+    end
+
+    subgraph "모니터링"
+        Prometheus["Prometheus<br/>:9090"]
+    end
+
+    subgraph "외부 서비스"
+        OpenAI_Main["OpenAI GPT<br/>(Main Model)"]
+        OpenAI_Judge["OpenAI GPT<br/>(Judge Model)"]
+    end
+
+    subgraph "알림 채널"
+        Slack["Slack"]
+        Discord["Discord"]
+        Email["Email<br/>(SMTP)"]
+    end
+
+    %% 클라이언트 연결
+    ClientApp --> WebDashboard
+    ClientApp --> Gateway
+
+    %% Gateway 연결
+    Gateway --> OpenAI_Main
+    Gateway --> Postgres
+    Gateway -.메트릭.-> Prometheus
+
+    %% Evaluator 연결
+    Postgres --> Evaluator
+    Evaluator --> OpenAI_Judge
+    Evaluator --> Slack
+    Evaluator --> Discord
+    Evaluator --> Email
+    Evaluator -.메트릭.-> Prometheus
+
+    %% Dashboard 연결
+    Postgres --> Dashboard
+
+    %% 모니터링 연결
+    Prometheus --> Grafana
+
+    style Gateway fill:#4CAF50
+    style Evaluator fill:#2196F3
+    style Postgres fill:#FF9800
+    style Prometheus fill:#E91E63
+    style Grafana fill:#9C27B0
+    style OpenAI_Main fill:#00BCD4
+    style OpenAI_Judge fill:#00BCD4
 ```
 
-### 기술 스택
+### 서비스 구성
 
-* **언어**: Python 3.12
-* **LLM Provider**: OpenAI GPT-5 mini (`responses` API 사용)
-* **웹 프레임워크**: FastAPI
-* **DB**: PostgreSQL 16
-* **ORM**: SQLAlchemy
-* **설정 관리**: Pydantic Settings
-* **의존성 관리**: [`uv`](https://github.com/astral-sh/uv)
-* **컨테이너**: Docker, Docker Compose
+| 서비스 | 포트 | 설명 |
+|--------|------|------|
+| **Gateway API** | 18000 | LLM 요청 처리 및 로깅 (FastAPI) |
+| **Evaluator** | 18001 | 자동 평가 및 알림 (FastAPI) |
+| **Dashboard** | 18002 | Streamlit 대시보드 (레거시) |
+| **Web Dashboard** | 3000 | Next.js 웹 대시보드 |
+| **PostgreSQL** | 5432 | 로그 및 평가 결과 저장 |
+| **Prometheus** | 9090 | 메트릭 수집 |
+| **Grafana** | 3001 | 모니터링 대시보드 |
 
 ---
 
-### 프로젝트 구조
+## 🚀 빠른 시작
 
-대략적인 디렉토리 구조:
+### 사전 요구사항
 
-```text
-LLM-Quality-Observer/
-├── services/
-│   ├── gateway-api/
-│   │   ├── app/
-│   │   │   ├── app/
-│   │   │   │   ├── main.py
-│   │   │   │   ├── config.py
-│   │   │   │   ├── llm_client.py
-│   │   │   │   ├── db.py
-│   │   │   │   ├── models.py
-│   │   │   │   ├── schemas.py
-│   │   │   └── pyproject.toml
-│   │   └── Dockerfile
-│   ├── evaluator/
-│   │   ├── app/
-│   │   │   └── pyproject.toml
-│   │   └── Dockerfile
-│   └── dashboard/
-│       ├── app/
-│       │   └── pyproject.toml
-│       └── Dockerfile
-├── infra/
-│   └── docker/
-│       └── docker-compose.local.yml
-├── configs/
-│   └── env/
-│       └── .env.local        # local 환경 변수 (git ignore 대상)
-└── README.md
-```
+- Docker & Docker Compose
+- OpenAI API Key
+- (선택) Slack/Discord Webhook URL
+- (선택) Gmail SMTP 계정
 
-#### `services/gateway-api`
+### 설치
 
-LLM 호출을 담당하는 **Gateway API 서비스**입니다.
-
-* `/health` : 헬스 체크
-* `/chat` : LLM 호출 + DB 로깅
-
-주요 파일:
-
-* `app/app/main.py`
-
-  * FastAPI 엔트리 포인트
-  * `/health`, `/chat` 엔드포인트 정의
-  * 최초 실행 시 `llm_logs` 테이블 생성
-  * LLM 응답을 DB에 저장하고 `ChatResponse`로 반환
-
-* `app/app/config.py`
-
-  * Pydantic `Settings` 정의
-  * 환경 변수 로드:
-
-    * `APP_ENV`
-    * `DATABASE_URL`
-    * `OPENAI_MODEL_MAIN`
-    * `LLM_API_BASE_URL`
-    * `LLM_API_KEY`
-    * `LOG_LEVEL`
-
-* `app/app/llm_client.py`
-
-  * OpenAI Python SDK 래퍼
-  * `OPENAI_MODEL_MAIN` 을 기본 모델로 사용
-  * `client.responses.create(...)` 호출
-  * `(response_text, latency_ms)` 튜플 반환
-
-* `app/app/db.py`
-
-  * SQLAlchemy 엔진 및 세션 생성
-  * FastAPI `Depends` 로 사용하는 `get_db()` 제공
-
-* `app/app/models.py`
-
-  * SQLAlchemy ORM 모델: `LLMLog`
-  * 컬럼:
-
-    * `id`, `created_at`
-    * `user_id`, `prompt`, `response`
-    * `model_version`
-    * `latency_ms`
-    * `status` (예: `"success"`)
-
-* `app/app/schemas.py`
-
-  * Pydantic 스키마:
-
-    * `ChatRequest` (요청)
-    * `ChatResponse` (응답)
-
-* `app/pyproject.toml`
-
-  * gateway-api 서비스용 Python 패키지/의존성 정의
-  * 로컬 및 Docker 빌드 시 `uv sync`에 사용
-
-#### `services/evaluator` (향후 구현)
-
-* `llm_logs` 테이블을 읽어 LLM 응답의 품질 점수를 계산하는 서비스
-* 휴리스틱, LLM-as-a-judge, 사람 피드백 등 다양한 방식의 평가를 시도할 예정
-* 현재는 `pyproject.toml`과 `Dockerfile`만 준비된 상태 (스켈레톤)
-
-#### `services/dashboard` (향후 구현)
-
-* 품질 지표, 지연 시간, 에러율 등을 시각화하는 대시보드 서비스
-* Streamlit 또는 FastAPI 기반 UI를 고려
-* 마찬가지로 `pyproject.toml`과 `Dockerfile`만 준비된 상태
-
-#### `infra/docker`
-
-* `docker-compose.local.yml`
-
-  * 로컬 개발용 Docker Compose 스택:
-
-    * `llm-postgres` (Postgres 16)
-    * `llm-gateway-api` (FastAPI + OpenAI client)
-    * `llm-evaluator` (placeholder)
-    * `llm-dashboard` (placeholder)
-  * 기본적으로 gateway-api를 `localhost:18000`에 바인딩
-
-#### `configs/env`
-
-* `.env.local`
-
-  * docker-compose에서 참조하는 local 환경 변수 파일
-  * 실제 경로/파일명은 `docker-compose.local.yml` 의 `env_file` 설정과 맞춰 사용
-
-예시 `.env.local`:
-
-```env
-# Application
-APP_ENV=local
-LOG_LEVEL=DEBUG
-
-# LLM
-OPENAI_MODEL_MAIN=gpt-5-mini
-LLM_API_BASE_URL=https://api.openai.com/v1
-LLM_API_KEY=sk-...
-
-# Database
-DATABASE_URL=postgresql://llm_user:llm_password@postgres:5432/llm_quality
-```
-
----
-
-### 로컬 실행 방법 (Docker)
-
-#### 1. 리포지토리 클론
-
+1. **리포지토리 클론**
 ```bash
 git clone https://github.com/dongkoony/LLM-Quality-Observer.git
 cd LLM-Quality-Observer
 ```
 
-#### 2. `.env.local` 설정
-
+2. **환경 변수 설정**
 ```bash
-cp configs/env/.env.local configs/env/.env.local.example  # 필요시 백업
-# 이후 configs/env/.env.local 내용을 직접 수정
+cp configs/env/.env.local.example configs/env/.env.local
+# .env.local 파일 편집하여 API 키 설정
 ```
 
-* `LLM_API_KEY` 에 OpenAI API 키 입력
-* `OPENAI_MODEL_MAIN` 을 `gpt-5-mini` 로 설정 (또는 다른 모델)
-
-#### 3. Docker Compose 실행
-
+3. **서비스 시작**
 ```bash
 cd infra/docker
 docker compose -f docker-compose.local.yml up --build
 ```
 
-* Gateway API: `http://localhost:18000`
-* Postgres: 컨테이너 내부에서 `postgres:5432`
+4. **서비스 확인**
+```bash
+# Gateway API
+curl http://localhost:18000/health
+
+# Evaluator
+curl http://localhost:18001/health
+
+# Prometheus
+open http://localhost:9090
+
+# Grafana
+open http://localhost:3001  # admin/admin
+```
 
 ---
 
-### Gateway API 사용법
+## 📖 사용 가이드
 
-#### Health 체크
-
-```bash
-curl http://localhost:18000/health
-# -> { "status": "ok" }
-```
-
-#### Swagger UI
-
-브라우저에서:
-
-```text
-http://localhost:18000/docs
-```
-
-에 접속 후 `POST /chat` 엔드포인트로 테스트 가능.
-
-#### `/chat` 예시 요청
+### 1. LLM 요청 전송
 
 ```bash
 curl -X POST "http://localhost:18000/chat" \
   -H "Content-Type: application/json" \
   -d '{
-    "prompt": "Explain what LLM-Quality-Observer is in one sentence.",
+    "prompt": "Explain quantum computing in simple terms",
     "user_id": "test-user",
-    "model_version": null
+    "model_version": "gpt-5-mini"
   }'
 ```
 
-예시 응답:
-
+**응답 예시:**
 ```json
 {
-  "response": "LLM-Quality-Observer is a monitoring and evaluation framework that continuously assesses and tracks the quality of large language model outputs.",
+  "id": 1,
+  "prompt": "Explain quantum computing...",
+  "response": "Quantum computing is...",
   "model_version": "gpt-5-mini",
-  "latency_ms": 4735.19
+  "latency_ms": 1234,
+  "status": "success"
 }
 ```
 
-이 호출 시:
+### 2. 평가 실행
 
-* OpenAI GPT-5 mini가 실제로 호출되고
-* 응답과 지연 시간이 계산되며
-* `llm_logs` 테이블에 로그가 저장됨
+**수동 평가:**
+```bash
+# 규칙 기반 평가
+curl -X POST "http://localhost:18001/evaluate-once?limit=10&judge_type=rule"
 
----
+# LLM-as-a-Judge 평가
+curl -X POST "http://localhost:18001/evaluate-once?limit=10&judge_type=llm"
+```
 
-### Postgres에서 로그 확인
+**자동 평가:** 스케줄러가 설정된 간격(기본 60분)마다 자동 실행
+
+### 3. 대시보드 확인
+
+**Grafana 대시보드:**
+1. http://localhost:3001 접속
+2. admin/admin으로 로그인
+3. Dashboards → LLM Quality Observer 선택
+
+**포함된 메트릭:**
+- HTTP 요청 비율 및 지연시간
+- LLM 모델별 성능
+- 평가 점수 분포
+- 알림 전송 현황
+- 스케줄러 실행 상태
+
+### 4. 데이터베이스 조회
 
 ```bash
+# PostgreSQL 접속
 docker exec -it llm-postgres psql -U llm_user -d llm_quality
 
+# 최근 로그 확인
 SELECT id, created_at, user_id,
-       LEFT(prompt, 60)   AS prompt_snippet,
-       LEFT(response, 60) AS response_snippet,
-       model_version,
-       latency_ms,
-       status
+       LEFT(prompt, 50) AS prompt,
+       model_version, latency_ms, status
 FROM llm_logs
 ORDER BY id DESC
+LIMIT 10;
+
+# 평가 결과 확인
+SELECT l.id, l.prompt,
+       e.score_overall, e.score_instruction_following, e.score_truthfulness,
+       e.judge_type, e.comments
+FROM llm_logs l
+JOIN llm_evaluations e ON l.id = e.log_id
+ORDER BY e.created_at DESC
 LIMIT 10;
 ```
 
 ---
 
-### 로드맵 (Roadmap)
+## 🔧 주요 기능 상세
 
-향후 계획:
+### Gateway API (v0.1.0+)
 
-* **Evaluator Service**
+**엔드포인트:**
+- `GET /health` - 헬스 체크
+- `POST /chat` - LLM 요청 처리
+- `GET /docs` - Swagger UI
+- `GET /metrics` - Prometheus 메트릭
 
-  * `llm_logs` 기반 품질 점수 계산
-  * 규칙/휴리스틱 기반 평가
-  * LLM-as-a-judge 프롬프트 기반 평가
-  * 사람 피드백(RLHF 스타일) 저장 및 활용
+**기능:**
+- OpenAI GPT 모델 호출
+- 자동 로깅 (프롬프트, 응답, 지연시간, 상태)
+- 모델 버전 추적
+- Prometheus 메트릭 수출
 
-* **Dashboard Service**
+### Evaluator Service (v0.2.0+)
 
-  * 모델/버전별 평균 점수
-  * 지연 시간 분포
-  * 에러율, 실패 패턴
-  * 기간 / 사용자 / 모델 버전 / 태그별 필터링
+**평가 방식:**
 
-* **Alerting / 알림**
+1. **규칙 기반 평가** (빠름, 저렴):
+   - 응답 길이 검사
+   - 키워드 검증
+   - 포맷 준수 확인
 
-  * 점수가 특정 임계값 이하로 떨어질 때 알림
-  * p95 latency 가 기준치를 넘을 때 알림
-  * Slack / 이메일 연동
+2. **LLM-as-a-Judge** (v0.3.0+, 정확, 비용 발생):
+   - GPT-4 기반 품질 평가
+   - 다차원 점수 (전체, 지시사항 준수, 진실성)
+   - 상세한 평가 코멘트
 
-* **Cost Awareness**
+**자동 스케줄러** (v0.4.0+):
+- APScheduler로 주기적 평가
+- 설정 가능한 간격 및 배치 크기
+- 자동 시작/정지
 
-  * 모델/버전별 토큰 사용량 및 비용 추적
-  * 품질 점수와 비용을 함께 보며 cost–quality 트레이드오프 분석
+**알림 시스템** (v0.4.0+, v0.5.0):
+- **Slack**: 웹훅 통합
+- **Discord**: 웹훅 통합
+- **Email** (v0.5.0): SMTP (Gmail 등)
+- 낮은 품질 즉시 알림
+- 배치 평가 요약
+
+### 모니터링 (v0.5.0)
+
+**Prometheus 메트릭:**
+- `llm_gateway_http_requests_total` - HTTP 요청 수
+- `llm_gateway_http_request_duration_seconds` - 요청 지연시간
+- `llm_gateway_llm_requests_total` - LLM 호출 수
+- `llm_evaluator_evaluations_total` - 평가 수
+- `llm_evaluator_evaluation_scores` - 점수 분포
+- `llm_evaluator_notifications_sent_total` - 알림 전송 수
+- `llm_evaluator_pending_logs` - 평가 대기 로그 수
+
+**Grafana 대시보드:**
+- 14개 시각화 패널
+- 실시간 성능 모니터링
+- 품질 추세 분석
+- 알림 현황 추적
 
 ---
+
+## ⚙️ 설정
+
+### 환경 변수
+
+```bash
+# 애플리케이션
+APP_ENV=local
+LOG_LEVEL=DEBUG
+
+# LLM 모델
+OPENAI_MODEL_MAIN=gpt-5-mini          # Gateway에서 사용할 모델
+OPENAI_MODEL_JUDGE=gpt-4o-mini        # 평가에 사용할 모델
+LLM_API_BASE_URL=https://api.openai.com/v1
+LLM_API_KEY=sk-...
+
+# 데이터베이스
+DATABASE_URL=postgresql://llm_user:llm_password@postgres:5432/llm_quality
+
+# 배치 평가 스케줄러 (v0.4.0+)
+ENABLE_AUTO_EVALUATION=true           # 자동 평가 활성화
+EVALUATION_INTERVAL_MINUTES=60        # 평가 주기 (분)
+EVALUATION_BATCH_SIZE=10              # 배치 크기
+EVALUATION_JUDGE_TYPE=rule            # 기본 평가 방식 (rule/llm)
+
+# 알림 설정 (v0.4.0+)
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/YOUR/WEBHOOK/URL
+NOTIFICATION_SCORE_THRESHOLD=3        # 알림 임계값 (≤ 3점)
+
+# 이메일 알림 (v0.5.0+)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your-email@gmail.com
+SMTP_PASSWORD=your-app-password
+SMTP_FROM_EMAIL=your-email@gmail.com
+SMTP_TO_EMAILS=recipient1@example.com,recipient2@example.com
+```
+
+---
+
+## 🏗️ 프로젝트 구조
+
+```
+LLM-Quality-Observer/
+├── services/
+│   ├── gateway-api/           # Gateway API 서비스
+│   │   ├── app/
+│   │   │   ├── main.py        # FastAPI 앱
+│   │   │   ├── config.py      # 설정
+│   │   │   ├── llm_client.py  # OpenAI 클라이언트
+│   │   │   ├── db.py          # 데이터베이스
+│   │   │   ├── models.py      # SQLAlchemy 모델
+│   │   │   ├── schemas.py     # Pydantic 스키마
+│   │   │   └── metrics.py     # Prometheus 메트릭
+│   │   ├── tests/
+│   │   ├── Dockerfile
+│   │   └── pyproject.toml
+│   │
+│   ├── evaluator/             # Evaluator 서비스
+│   │   ├── app/
+│   │   │   ├── main.py        # FastAPI 앱
+│   │   │   ├── rules.py       # 규칙 기반 평가
+│   │   │   ├── llm_judge.py   # LLM-as-a-Judge
+│   │   │   ├── scheduler.py   # APScheduler
+│   │   │   ├── notifier.py    # 알림 시스템
+│   │   │   ├── metrics.py     # Prometheus 메트릭
+│   │   │   └── utils.py       # 유틸리티
+│   │   ├── tests/
+│   │   ├── Dockerfile
+│   │   └── pyproject.toml
+│   │
+│   ├── dashboard/             # Streamlit 대시보드
+│   │   ├── app/
+│   │   │   ├── main.py
+│   │   │   ├── models.py
+│   │   │   └── config.py
+│   │   ├── Dockerfile
+│   │   └── pyproject.toml
+│   │
+│   └── web/                   # Next.js 웹 대시보드
+│       └── dashboard/
+│           ├── app/
+│           ├── components/
+│           ├── locales/       # 다국어 지원
+│           └── lib/
+│
+├── infra/
+│   ├── docker/
+│   │   └── docker-compose.local.yml
+│   ├── prometheus/
+│   │   └── prometheus.yml
+│   └── grafana/
+│       ├── provisioning/
+│       ├── dashboards/
+│       └── DASHBOARD_GUIDE-ko.md
+│
+├── configs/
+│   └── env/
+│       ├── .env.local.example
+│       └── .env.local          # gitignored
+│
+├── docs/
+│   ├── release_notes/         # 릴리즈 노트
+│   │   ├── RELEASE_NOTES_v0.1.0.md
+│   │   ├── RELEASE_NOTES_v0.2.0.md
+│   │   ├── RELEASE_NOTES_v0.3.0.md
+│   │   ├── RELEASE_NOTES_v0.4.0.md
+│   │   └── RELEASE_NOTES_v0.5.0.md
+│   ├── RELEASE_NOTES_v0.5.0_ko.md
+│   ├── METRICS.md
+│   ├── EMAIL_SETUP.md
+│   └── README-main-us.md
+│
+├── .github/
+│   └── workflows/
+│       └── ci.yml             # GitHub Actions CI/CD
+│
+├── .flake8                    # Flake8 설정
+└── README.md
+```
+
+---
+
+## 🧪 테스트
+
+### 헬스 체크 테스트
+
+```bash
+# 모든 서비스 헬스 체크
+curl http://localhost:18000/health  # Gateway API
+curl http://localhost:18001/health  # Evaluator
+curl http://localhost:9090/-/healthy # Prometheus
+curl http://localhost:3001/api/health # Grafana
+```
+
+### 통합 테스트
+
+```bash
+# 1. LLM 요청 전송
+curl -X POST "http://localhost:18000/chat" \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "Test", "user_id": "test"}'
+
+# 2. 평가 실행
+curl -X POST "http://localhost:18001/evaluate-once?limit=1"
+
+# 3. 메트릭 확인
+curl http://localhost:18000/metrics | grep llm_gateway
+curl http://localhost:18001/metrics | grep llm_evaluator
+
+# 4. Grafana 대시보드 확인
+open http://localhost:3001
+```
+
+### 자동화 테스트
+
+```bash
+# CI/CD 파이프라인 로컬 실행
+cd services/gateway-api
+pytest tests/
+
+cd ../evaluator
+pytest tests/
+
+# Lint 체크
+flake8 services/
+```
+
+---
+
+## 📈 모니터링 가이드
+
+### Prometheus 쿼리 예시
+
+```promql
+# HTTP 요청 비율
+sum(rate(llm_gateway_http_requests_total[5m]))
+
+# LLM 지연시간 p95
+histogram_quantile(0.95, sum(rate(llm_gateway_llm_request_duration_seconds_bucket[5m])) by (le, model))
+
+# 평가 점수 중앙값
+histogram_quantile(0.50, sum(rate(llm_evaluator_evaluation_scores_bucket{score_type="overall"}[5m])) by (le))
+
+# 평가 대기 로그 수
+llm_evaluator_pending_logs
+```
+
+### Grafana 대시보드 사용
+
+자세한 가이드는 [Grafana 대시보드 가이드](./infra/grafana/DASHBOARD_GUIDE-ko.md) 참조
+
+---
+
+## 📚 문서
+
+### 릴리즈 노트
+
+- [v0.5.0 (Latest)](./docs/RELEASE_NOTES_v0.5.0_ko.md) - Prometheus, Grafana, 이메일 알림
+- [v0.4.0](./docs/release_notes/RELEASE_NOTES_v0.4.0.md) - 스케줄러, Slack/Discord 알림, CI/CD
+- [v0.3.0](./docs/release_notes/RELEASE_NOTES_v0.3.0.md) - LLM-as-a-Judge, 다국어 지원
+- [v0.2.0](./docs/release_notes/RELEASE_NOTES_v0.2.0.md) - Dashboard, CORS, 규칙 기반 평가
+- [v0.1.0](./docs/release_notes/RELEASE_NOTES_v0.1.0.md) - 초기 릴리즈 (Gateway + Evaluator)
+
+### 기술 문서
+
+- [메트릭 참조](./docs/METRICS.md) - Prometheus 메트릭 상세
+- [이메일 설정 가이드](./docs/EMAIL_SETUP.md) - Gmail SMTP 설정
+- [Grafana 대시보드 가이드](./infra/grafana/DASHBOARD_GUIDE-ko.md) - 대시보드 사용법
+
+---
+
+## 🛣️ 로드맵
+
+### 완료된 기능
+
+- ✅ v0.1.0: Gateway API + Evaluator 기본 구조
+- ✅ v0.2.0: 웹 대시보드 + 규칙 기반 평가
+- ✅ v0.3.0: LLM-as-a-Judge + 다국어 지원
+- ✅ v0.4.0: 자동 스케줄러 + Slack/Discord 알림
+- ✅ v0.5.0: Prometheus + Grafana + 이메일 알림
+
+### 향후 계획 (v0.6.0+)
+
+- [ ] **Alertmanager 통합**: 고급 알림 규칙 및 라우팅
+- [ ] **다중 LLM 제공자 지원**: Anthropic Claude, Google Gemini 등
+- [ ] **비용 추적**: 토큰 사용량 및 비용 모니터링
+- [ ] **A/B 테스트**: 프롬프트 및 모델 비교
+- [ ] **사용자 피드백**: RLHF 스타일 사람 평가
+- [ ] **Kubernetes 배포**: Helm 차트 및 배포 가이드
+- [ ] **API 인증**: JWT 기반 보안
+- [ ] **Rate Limiting**: 요청 제한 및 할당량 관리
+
+---
+
+## 🔒 보안
+
+### 주의사항
+
+- `.env.local` 파일을 절대 커밋하지 마세요 (gitignored)
+- OpenAI API 키를 안전하게 보관하세요
+- Slack/Discord 웹훅 URL을 공개하지 마세요
+- SMTP 비밀번호는 앱 비밀번호를 사용하세요 (Gmail)
+
+### 권장사항
+
+- 프로덕션에서는 환경 변수를 시크릿 관리자에 저장
+- API 엔드포인트에 인증 추가 (v0.6.0+)
+- HTTPS/TLS 사용
+- 정기적인 의존성 업데이트
+
+---
+
+## 🤝 기여
+
+기여를 환영합니다! 다음 절차를 따라주세요:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feat/amazing-feature`)
+3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
+4. Push to the branch (`git push origin feat/amazing-feature`)
+5. Open a Pull Request
+
+### 개발 가이드라인
+
+- Python 코드는 Flake8 스타일 가이드 준수
+- 모든 PR은 CI 테스트 통과 필수
+- 커밋 메시지는 Conventional Commits 형식 사용
+- 새 기능에는 테스트 추가
+
+---
+
+## 📄 라이선스
+
+이 프로젝트는 MIT 라이선스 하에 배포됩니다.
+
+---
+
+## 👥 제작자
+
+**Dong-hyeon Shin (dongkoony)**
+- GitHub: [@dongkoony](https://github.com/dongkoony)
+- Email: dhyeon.shin@icloud.com
+
+---
+
+
+## 📞 문의 및 지원
+
+- **Issues**: [GitHub Issues](https://github.com/dongkoony/LLM-Quality-Observer/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/dongkoony/LLM-Quality-Observer/discussions)
+- **Email**: dhyeon.shin@icloud.com
+
+---
+
+**⭐ 이 프로젝트가 도움이 되셨다면 Star를 눌러주세요!**
