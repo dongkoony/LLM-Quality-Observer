@@ -1,0 +1,24 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'llm-quality-observer'
+
+scrape_configs:
+  - job_name: 'gateway-api'
+    static_configs:
+      - targets: ['gateway-api:8000']
+        labels:
+          service: 'gateway-api'
+          environment: 'local'
+
+  - job_name: 'evaluator'
+    static_configs:
+      - targets: ['evaluator:8000']
+        labels:
+          service: 'evaluator'
+          environment: 'local'
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
