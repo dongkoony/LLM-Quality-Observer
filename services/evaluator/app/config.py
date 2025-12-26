@@ -25,6 +25,14 @@ class Settings(BaseSettings):
     discord_webhook_url: str | None = None  # Discord 웹훅 URL
     notification_score_threshold: int = 3  # 알림 보낼 점수 임계값 (이하일 때 알림)
 
+    # Email Notification Settings
+    smtp_host: str | None = None  # SMTP 서버 주소
+    smtp_port: int = 587  # SMTP 포트 (기본 587 - TLS)
+    smtp_username: str | None = None  # SMTP 사용자명
+    smtp_password: str | None = None  # SMTP 비밀번호
+    smtp_from_email: str | None = None  # 발신자 이메일
+    smtp_to_emails: str | None = None  # 수신자 이메일들 (쉼표로 구분)
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
