@@ -1,8 +1,10 @@
-from fastapi import FastAPI, Depends, Query
+from fastapi import FastAPI, Depends, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import func, select, distinct
 import math
+import time
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 
 from .db import Base, engine, get_db
 from .models import LLMLog, LLMEvaluation
@@ -21,11 +23,20 @@ from .schemas import (
 )
 from .llm_client import call_llm
 from .config import settings
+from .metrics import (
+    MetricsMiddleware,
+    record_llm_request,
+    record_db_query,
+    record_log_saved,
+)
 
 # 최초 실행 시 테이블 생성 (간단 버전)
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="LLM Quality Observer - Gateway API")
+
+# Prometheus 메트릭 미들웨어 추가
+app.add_middleware(MetricsMiddleware)
 
 # CORS 설정 추가 (웹 대시보드에서 API 호출을 위해 필요)
 app.add_middleware(
@@ -40,6 +51,12 @@ app.add_middleware(
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+
+@app.get("/metrics")
+def metrics():
+    """Prometheus 메트릭 엔드포인트"""
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 def resolve_model_version(request_model: str | None) -> str:
@@ -58,9 +75,19 @@ def chat(request: ChatRequest, db: Session = Depends(get_db)):
     used_model = resolve_model_version(request.model_version)
 
     # LLM 호출 (사용할 모델 명을 넘겨줌)
+    llm_start = time.time()
     response_text, latency_ms = call_llm(request.prompt, used_model)
+    llm_duration = time.time() - llm_start
+
+    # LLM 메트릭 기록
+    record_llm_request(
+        model=used_model,
+        status="success",
+        duration_seconds=llm_duration
+    )
 
     # DB 로그 저장
+    db_start = time.time()
     log = LLMLog(
         user_id=request.user_id,
         prompt=request.prompt,
@@ -72,6 +99,11 @@ def chat(request: ChatRequest, db: Session = Depends(get_db)):
     db.add(log)
     db.commit()
     db.refresh(log)
+    db_duration = time.time() - db_start
+
+    # DB 메트릭 기록
+    record_db_query(operation="insert", table="llm_logs", duration_seconds=db_duration)
+    record_log_saved(status="success")
 
     # 클라이언트 응답
     return ChatResponse(

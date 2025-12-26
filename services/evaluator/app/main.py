@@ -1,8 +1,10 @@
 from typing import Literal
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends, Query, HTTPException
+from fastapi import FastAPI, Depends, Query, HTTPException, Response
 from sqlalchemy.orm import Session
 import logging
+import time
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 
 from .db import Base, engine, get_db
 from .models import LLMLog, LLMEvaluation
@@ -11,6 +13,8 @@ from .llm_judge import run_judge
 from .config import settings
 from .scheduler import start_scheduler, stop_scheduler
 from .utils import get_pending_logs
+from .metrics import record_evaluation, update_pending_logs_count
+from .notifier import send_low_quality_alert
 
 # 로깅 설정
 logging.basicConfig(
@@ -55,6 +59,12 @@ def health_check():
         "status": "ok",
         "env": settings.app_env,
     }
+
+
+@app.get("/metrics")
+def metrics():
+    """Prometheus 메트릭 엔드포인트"""
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 @app.post("/evaluate-once")
@@ -129,6 +139,11 @@ def evaluate_once(
 
             # DB에 추가
             db.add(evaluation)
+            db.commit()  # 커밋해서 evaluation.id 생성
+
+            # 낮은 품질 알림 전송
+            send_low_quality_alert(log, evaluation)
+
             evaluated_count += 1
 
         except HTTPException as e:
@@ -139,9 +154,6 @@ def evaluate_once(
             # 기타 예외 처리
             db.rollback()
             raise HTTPException(status_code=500, detail=f"Evaluation failed: {str(e)}")
-
-    # 3. 모든 평가 결과 커밋
-    db.commit()
 
     # 4. 결과 반환
     return {
