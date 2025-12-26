@@ -4,6 +4,7 @@ APScheduler를 사용하여 주기적으로 LLM 로그를 자동 평가합니다
 """
 
 import logging
+import time
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from sqlalchemy.orm import Session
@@ -15,6 +16,12 @@ from .models import LLMLog, LLMEvaluation
 from .rules import basic_rule_evaluate
 from .llm_judge import run_judge
 from .notifier import send_low_quality_alert, send_batch_evaluation_summary
+from .metrics import (
+    record_evaluation,
+    record_batch_evaluation,
+    record_scheduler_run,
+    update_pending_logs_count,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +56,7 @@ def run_batch_evaluation():
         judge_model_name = ""
 
         for log in pending_logs:
+            eval_start = time.time()
             try:
                 if judge_type == "rule":
                     # 룰 기반 평가
@@ -84,6 +92,15 @@ def run_batch_evaluation():
                 db.add(evaluation)
                 db.commit()
                 evaluated_count += 1
+                eval_duration = time.time() - eval_start
+
+                # 메트릭 기록
+                scores = {
+                    'overall': evaluation.overall_score,
+                    'instruction': evaluation.score_instruction_following,
+                    'truthfulness': evaluation.score_truthfulness,
+                }
+                record_evaluation(judge_type, "success", eval_duration, scores)
 
                 # 품질 점수가 낮으면 알림 전송
                 send_low_quality_alert(log, evaluation)
@@ -94,6 +111,8 @@ def run_batch_evaluation():
                 )
 
             except Exception as e:
+                eval_duration = time.time() - eval_start
+                record_evaluation(judge_type, "error", eval_duration)
                 logger.error(f"Failed to evaluate log_id={log.id}: {str(e)}")
                 db.rollback()
                 continue
@@ -105,12 +124,19 @@ def run_batch_evaluation():
                 judge_type=judge_type,
                 judge_model=judge_model_name
             )
+            # 배치 메트릭 기록
+            record_batch_evaluation(judge_type, evaluated_count)
+
+        # 스케줄러 성공 기록
+        record_scheduler_run("success")
 
         logger.info(
             f"Batch evaluation completed: {evaluated_count}/{len(pending_logs)} logs evaluated"
         )
 
     except Exception as e:
+        # 스케줄러 실패 기록
+        record_scheduler_run("error")
         logger.error(f"Batch evaluation failed: {str(e)}")
         db.rollback()
     finally:
