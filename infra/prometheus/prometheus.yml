@@ -4,6 +4,19 @@ global:
   external_labels:
     monitor: 'llm-quality-observer'
 
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+# Alert rules files
+rule_files:
+  - '/etc/prometheus/alerts/http_alerts.yml'
+  - '/etc/prometheus/alerts/llm_alerts.yml'
+  - '/etc/prometheus/alerts/evaluation_alerts.yml'
+  - '/etc/prometheus/alerts/system_alerts.yml'
+
 scrape_configs:
   - job_name: 'gateway-api'
     static_configs:

@@ -16,11 +16,13 @@
 - ✅ **스케줄러**: 배치 평가 자동 실행 (APScheduler)
 - ✅ **다중 채널 알림**: Slack, Discord, Email 통합
 - ✅ **모니터링**: Prometheus 메트릭 수집 + Grafana 대시보드
+- ✅ **고급 알림**: Alertmanager 통합 (42개 프로덕션 Alert Rules)
+- ✅ **고급 분석**: 시간대별 품질 트렌드 + 모델 성능 비교 API
 - ✅ **웹 대시보드**: Next.js 기반 실시간 품질 시각화
 - ✅ **다국어 지원**: 영어, 한국어, 일본어, 중국어
 - ✅ **CI/CD**: GitHub Actions 자동화 파이프라인
 
-> **현재 버전: v0.5.0** — Prometheus, Grafana, 이메일 알림 추가 완료
+> **현재 버전: v0.6.0** — Alertmanager, Alert Rules, 고급 분석 API 추가 완료
 
 ---
 
@@ -47,8 +49,9 @@ flowchart TB
         Postgres["PostgreSQL<br/>:5432"]
     end
 
-    subgraph "모니터링"
+    subgraph "모니터링 & 알림"
         Prometheus["Prometheus<br/>:9090"]
+        Alertmanager["Alertmanager<br/>:9093"]
     end
 
     subgraph "외부 서비스"
@@ -84,11 +87,16 @@ flowchart TB
 
     %% 모니터링 연결
     Prometheus --> Grafana
+    Prometheus --> Alertmanager
+    Alertmanager --> Slack
+    Alertmanager --> Discord
+    Alertmanager --> Email
 
     style Gateway fill:#4CAF50
     style Evaluator fill:#2196F3
     style Postgres fill:#FF9800
     style Prometheus fill:#E91E63
+    style Alertmanager fill:#F44336
     style Grafana fill:#9C27B0
     style OpenAI_Main fill:#00BCD4
     style OpenAI_Judge fill:#00BCD4
@@ -103,8 +111,9 @@ flowchart TB
 | **Dashboard** | 18002 | Streamlit 대시보드 (레거시) |
 | **Web Dashboard** | 3000 | Next.js 웹 대시보드 |
 | **PostgreSQL** | 5432 | 로그 및 평가 결과 저장 |
-| **Prometheus** | 9090 | 메트릭 수집 |
-| **Grafana** | 3001 | 모니터링 대시보드 |
+| **Prometheus** | 9090 | 메트릭 수집 및 Alert Rules |
+| **Alertmanager** | 9093 | Alert 라우팅 및 그룹핑 |
+| **Grafana** | 3001 | 모니터링 대시보드 (3개 대시보드) |
 
 ---
 

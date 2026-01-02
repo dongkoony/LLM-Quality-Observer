@@ -1,10 +1,10 @@
 # LLM Quality Observer 로드맵
 
-> **현재 버전**: v0.5.0
-> 
+> **현재 버전**: v0.6.0
+>
 > **목표 버전**: v1.0.0 (Production-Ready)
-> 
-> **마지막 업데이트**: 2025-12-26
+>
+> **마지막 업데이트**: 2026-01-02
 
 이 문서는 LLM Quality Observer의 v1.0.0까지의 개발 로드맵을 정의합니다.
 
@@ -41,49 +41,52 @@
 
 ## 🚀 마이너 릴리즈 계획
 
-### v0.6.0 - Alerting & Advanced Analytics
+### v0.6.0 - Alerting & Advanced Analytics ✅
 
-**예상 릴리즈**: 2025년 1월 중순
-**개발 기간**: 2-3주
+**릴리즈 날짜**: 2026-01-02
+**개발 기간**: 완료
 **테마**: 알림 고도화 및 분석 기능 강화
 
 #### 주요 기능
 
-##### 1. Prometheus Alertmanager 통합
-- [ ] Alertmanager 컨테이너 추가
-- [ ] Alert Rules 정의 (`infra/prometheus/alerts/`)
+##### 1. Prometheus Alertmanager 통합 ✅
+- [x] Alertmanager 컨테이너 추가
+- [x] Alert Rules 정의 (`infra/prometheus/alerts/`)
+  - 42개 규칙 (HTTP 7개, LLM 8개, Evaluation 12개, System 15개)
   - 높은 HTTP 에러율 (>5%)
   - 평가 점수 급락 (p50 < 3)
   - 스케줄러 중단 감지
-  - Pending Logs 급증 (>100)
-- [ ] Alert Routing 설정 (Slack, Discord, Email)
-- [ ] Alert Silence/Mute 기능
-- [ ] Alert Dashboard in Grafana
+  - Pending Logs 급증 (>1000)
+- [x] Alert Routing 설정 (Slack, Discord, Email)
+- [x] Alert Grouping 및 Inhibition Rules
+- [x] Alert Dashboard in Grafana (11 panels)
 
-##### 2. 고급 분석 기능
-- [ ] 시간대별 품질 트렌드 분석
-- [ ] 사용자별 품질 메트릭 집계
-- [ ] 모델 간 비교 분석 대시보드
-- [ ] 프롬프트 패턴 분석 (자주 실패하는 프롬프트 유형)
+##### 2. 고급 분석 기능 ✅
+- [x] 시간대별 품질 트렌드 분석 (hourly breakdown)
+- [x] 모델 간 비교 분석 대시보드 (p50/p95/p99 latency)
+- [x] 품질 점수 분포 분석 (low/high quality count)
+- [x] 에러율 및 성공률 추적
 
-##### 3. API 개선
-- [ ] `/analytics/trends` 엔드포인트 추가
-- [ ] `/analytics/compare-models` 엔드포인트 추가
-- [ ] `/alerts/history` 엔드포인트 추가
-- [ ] 페이지네이션 지원 (limit, offset)
+##### 3. API 개선 ✅
+- [x] `/analytics/trends` 엔드포인트 추가
+- [x] `/analytics/compare-models` 엔드포인트 추가
+- [x] `/alerts/history` 엔드포인트 추가
+- [x] 페이지네이션 지원 (page, page_size)
 
-##### 4. 대시보드 개선
-- [ ] Grafana 대시보드 2개 추가
-  - Alert History Dashboard
-  - Advanced Analytics Dashboard
-- [ ] Streamlit 대시보드 개선
-  - 시계열 분석 페이지 추가
-  - 모델 비교 페이지 추가
+##### 4. 대시보드 개선 ✅
+- [x] Grafana 대시보드 2개 추가
+  - Alert History Dashboard (11 panels)
+  - Advanced Analytics Dashboard (11 panels)
+- [x] 완전한 프로비저닝 설정
+- [x] 자동 대시보드 로딩
 
 #### 기술 부채 해결
-- [ ] SQLAlchemy 2.0 마이그레이션
-- [ ] 테스트 커버리지 50% 달성
-- [ ] CI/CD에 통합 테스트 추가
+- [ ] SQLAlchemy 2.0 마이그레이션 (v0.7.0으로 이연)
+- [ ] 테스트 커버리지 50% 달성 (v0.7.0으로 이연)
+- [ ] CI/CD에 통합 테스트 추가 (v0.7.0으로 이연)
+
+#### 릴리즈 노트
+[RELEASE_NOTES_v0.6.0.md](./release_notes/RELEASE_NOTES_v0.6.0.md) 참고
 
 ---
 

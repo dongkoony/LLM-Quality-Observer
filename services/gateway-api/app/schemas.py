@@ -120,3 +120,67 @@ class TimeSeriesDataPoint(BaseModel):
 class TimeSeriesResponse(BaseModel):
     """시간별 추이 데이터"""
     data: list[TimeSeriesDataPoint]
+
+
+# Analytics API Schemas (v0.6.0)
+
+class HourlyTrendDataPoint(BaseModel):
+    """시간대별 데이터 포인트 (hourly breakdown)"""
+    hour: str  # YYYY-MM-DD HH:00:00 형식
+    avg_score: float | None
+    avg_latency_ms: float | None
+    total_requests: int
+    total_evaluated: int
+    error_rate: float | None  # 에러율 (%)
+
+
+class HourlyTrendResponse(BaseModel):
+    """시간대별 추이 데이터 (Analytics)"""
+    data: list[HourlyTrendDataPoint]
+    summary: dict  # 전체 통계 요약
+
+
+class ModelComparisonDetail(BaseModel):
+    """모델 상세 비교 데이터"""
+    model_version: str
+    total_requests: int
+    success_rate: float  # 성공률 (%)
+    error_rate: float  # 에러율 (%)
+    avg_latency_ms: float | None
+    p50_latency_ms: float | None
+    p95_latency_ms: float | None
+    p99_latency_ms: float | None
+    avg_score: float | None
+    total_evaluated: int
+    low_quality_count: int  # 점수 < 3인 개수
+    high_quality_count: int  # 점수 >= 4인 개수
+
+
+class ModelComparisonResponse(BaseModel):
+    """모델 비교 응답"""
+    models: list[ModelComparisonDetail]
+    best_model_by_latency: str | None
+    best_model_by_quality: str | None
+    best_model_by_stability: str | None  # 가장 낮은 에러율
+
+
+class AlertInfo(BaseModel):
+    """Alert 정보"""
+    alert_name: str
+    severity: str
+    service: str
+    summary: str | None
+    description: str | None
+    started_at: str
+    ended_at: str | None
+    duration_seconds: int | None
+    status: str  # firing, resolved
+
+
+class AlertHistoryResponse(BaseModel):
+    """Alert 이력 응답"""
+    alerts: list[AlertInfo]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int

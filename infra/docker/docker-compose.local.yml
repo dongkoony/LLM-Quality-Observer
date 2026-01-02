@@ -63,12 +63,27 @@ services:
       - '--web.enable-lifecycle'
     volumes:
       - ../prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ../prometheus/alerts:/etc/prometheus/alerts
       - prometheus_data:/prometheus
     ports:
       - "9090:9090"
     depends_on:
       - gateway-api
       - evaluator
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: llm-alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    volumes:
+      - ../alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - alertmanager_data:/alertmanager
+    ports:
+      - "9093:9093"
+    depends_on:
+      - prometheus
 
   grafana:
     image: grafana/grafana:latest
@@ -89,4 +104,5 @@ services:
 volumes:
   postgres_data:
   prometheus_data:
+  alertmanager_data:
   grafana_data:

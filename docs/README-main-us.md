@@ -16,11 +16,13 @@ Built on a microservices architecture, it logs LLM interactions, automatically e
 - ✅ **Scheduler**: Automated batch evaluation (APScheduler)
 - ✅ **Multi-Channel Notifications**: Slack, Discord, Email integration
 - ✅ **Monitoring**: Prometheus metrics collection + Grafana dashboards
+- ✅ **Advanced Alerting**: Alertmanager integration (42 production Alert Rules)
+- ✅ **Advanced Analytics**: Hourly quality trends + model performance comparison API
 - ✅ **Web Dashboard**: Next.js-based real-time quality visualization
 - ✅ **Multi-Language Support**: English, Korean, Japanese, Chinese
 - ✅ **CI/CD**: GitHub Actions automation pipeline
 
-> **Current Version: v0.5.0** — Prometheus, Grafana, Email notifications added
+> **Current Version: v0.6.0** — Alertmanager, Alert Rules, Advanced Analytics API added
 
 ---
 
@@ -47,8 +49,9 @@ flowchart TB
         Postgres["PostgreSQL<br/>:5432"]
     end
 
-    subgraph "Monitoring"
+    subgraph "Monitoring & Alerting"
         Prometheus["Prometheus<br/>:9090"]
+        Alertmanager["Alertmanager<br/>:9093"]
     end
 
     subgraph "External Services"
@@ -84,11 +87,16 @@ flowchart TB
 
     %% Monitoring connections
     Prometheus --> Grafana
+    Prometheus --> Alertmanager
+    Alertmanager --> Slack
+    Alertmanager --> Discord
+    Alertmanager --> Email
 
     style Gateway fill:#4CAF50
     style Evaluator fill:#2196F3
     style Postgres fill:#FF9800
     style Prometheus fill:#E91E63
+    style Alertmanager fill:#F44336
     style Grafana fill:#9C27B0
     style OpenAI_Main fill:#00BCD4
     style OpenAI_Judge fill:#00BCD4
@@ -103,8 +111,9 @@ flowchart TB
 | **Dashboard** | 18002 | Streamlit dashboard (legacy) |
 | **Web Dashboard** | 3000 | Next.js web dashboard |
 | **PostgreSQL** | 5432 | Log and evaluation result storage |
-| **Prometheus** | 9090 | Metrics collection |
-| **Grafana** | 3001 | Monitoring dashboard |
+| **Prometheus** | 9090 | Metrics collection and Alert Rules |
+| **Alertmanager** | 9093 | Alert routing and grouping |
+| **Grafana** | 3001 | Monitoring dashboards (3 dashboards) |
 
 ---
 

@@ -1,10 +1,10 @@
 # LLM Quality Observer Roadmap
 
-> **Current Version**: v0.5.0
-> 
+> **Current Version**: v0.6.0
+>
 > **Target Version**: v1.0.0 (Production-Ready)
-> 
-> **Last Updated**: 2025-12-26
+>
+> **Last Updated**: 2026-01-02
 
 This document defines the development roadmap for LLM Quality Observer leading to v1.0.0.
 
@@ -41,49 +41,52 @@ Patch releases are documented in `CHANGELOG.md` and announced via GitHub Release
 
 ## 🚀 Minor Release Plans
 
-### v0.6.0 - Alerting & Advanced Analytics
+### v0.6.0 - Alerting & Advanced Analytics ✅
 
-**Expected Release**: Mid-January 2025
-**Development Period**: 2-3 weeks
+**Release Date**: January 2, 2026
+**Development Period**: Completed
 **Theme**: Advanced alerting and analytics capabilities
 
 #### Major Features
 
-##### 1. Prometheus Alertmanager Integration
-- [ ] Add Alertmanager container
-- [ ] Define Alert Rules (`infra/prometheus/alerts/`)
+##### 1. Prometheus Alertmanager Integration ✅
+- [x] Add Alertmanager container
+- [x] Define Alert Rules (`infra/prometheus/alerts/`)
+  - 42 rules (7 HTTP, 8 LLM, 12 Evaluation, 15 System)
   - High HTTP error rate (>5%)
   - Evaluation score drop (p50 < 3)
   - Scheduler failure detection
-  - Pending logs spike (>100)
-- [ ] Configure Alert Routing (Slack, Discord, Email)
-- [ ] Alert Silence/Mute functionality
-- [ ] Alert Dashboard in Grafana
+  - Pending logs spike (>1000)
+- [x] Configure Alert Routing (Slack, Discord, Email)
+- [x] Alert Grouping and Inhibition Rules
+- [x] Alert Dashboard in Grafana (11 panels)
 
-##### 2. Advanced Analytics
-- [ ] Time-based quality trend analysis
-- [ ] Per-user quality metrics aggregation
-- [ ] Model comparison dashboard
-- [ ] Prompt pattern analysis (frequently failing prompt types)
+##### 2. Advanced Analytics ✅
+- [x] Time-based quality trend analysis (hourly breakdown)
+- [x] Model comparison dashboard (p50/p95/p99 latency)
+- [x] Quality score distribution analysis (low/high quality count)
+- [x] Error rate and success rate tracking
 
-##### 3. API Improvements
-- [ ] Add `/analytics/trends` endpoint
-- [ ] Add `/analytics/compare-models` endpoint
-- [ ] Add `/alerts/history` endpoint
-- [ ] Pagination support (limit, offset)
+##### 3. API Improvements ✅
+- [x] Add `/analytics/trends` endpoint
+- [x] Add `/analytics/compare-models` endpoint
+- [x] Add `/alerts/history` endpoint
+- [x] Pagination support (page, page_size)
 
-##### 4. Dashboard Improvements
-- [ ] Add 2 new Grafana dashboards
-  - Alert History Dashboard
-  - Advanced Analytics Dashboard
-- [ ] Improve Streamlit dashboard
-  - Add time-series analysis page
-  - Add model comparison page
+##### 4. Dashboard Improvements ✅
+- [x] Add 2 new Grafana dashboards
+  - Alert History Dashboard (11 panels)
+  - Advanced Analytics Dashboard (11 panels)
+- [x] Complete provisioning setup
+- [x] Automatic dashboard loading
 
 #### Technical Debt Resolution
-- [ ] Migrate to SQLAlchemy 2.0
-- [ ] Achieve 50% test coverage
-- [ ] Add integration tests to CI/CD
+- [ ] Migrate to SQLAlchemy 2.0 (deferred to v0.7.0)
+- [ ] Achieve 50% test coverage (deferred to v0.7.0)
+- [ ] Add integration tests to CI/CD (deferred to v0.7.0)
+
+#### Release Notes
+See [RELEASE_NOTES_v0.6.0.md](./release_notes/RELEASE_NOTES_v0.6.0.md)
 
 ---
 
