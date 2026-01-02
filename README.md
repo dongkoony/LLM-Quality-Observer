@@ -1,4 +1,13 @@
-# LLM-Quality-Observer
+  # LLM-Quality-Observer
+
+  [![Release](https://img.shields.io/github/v/release/dongkoony/LLM-Quality-Observer)](https://github.com/dongkoony/LLM-Quality-Observer/releases)
+  [![License](https://img.shields.io/github/license/dongkoony/LLM-Quality-Observer)](LICENSE)
+  [![Stars](https://img.shields.io/github/stars/dongkoony/LLM-Quality-Observer)](https://github.com/dongkoony/LLM-Quality-Observer/stargazers)
+  [![Docker](https://img.shields.io/badge/docker-ready-blue)](https://www.docker.com/)
+  [![Prometheus](https://img.shields.io/badge/prometheus-integrated-orange)](https://prometheus.io/)
+  [![Grafana](https://img.shields.io/badge/grafana-dashboards-brightgreen)](https://grafana.com/)
+
+  > Production-ready MLOps platform for LLM quality monitoring
 
 [🇰🇷 KR](README.md) | [🇺🇸 EN](docs/README-main-us.md)
 
