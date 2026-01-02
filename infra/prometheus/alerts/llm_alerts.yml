@@ -1,0 +1,119 @@
+groups:
+  - name: llm_alerts
+    interval: 30s
+    rules:
+      # High LLM error rate (>5%)
+      - alert: HighLLMErrorRate
+        expr: |
+          (
+            sum(rate(llm_requests_total{status="error"}[5m]))
+            /
+            sum(rate(llm_requests_total[5m]))
+          ) * 100 > 5
+        for: 3m
+        labels:
+          severity: critical
+          service: gateway-api
+        annotations:
+          summary: "High LLM error rate detected"
+          description: "LLM error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+
+      # Moderate LLM error rate (>2%)
+      - alert: ModerateLLMErrorRate
+        expr: |
+          (
+            sum(rate(llm_requests_total{status="error"}[5m]))
+            /
+            sum(rate(llm_requests_total[5m]))
+          ) * 100 > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: gateway-api
+        annotations:
+          summary: "Moderate LLM error rate detected"
+          description: "LLM error rate is {{ $value | humanizePercentage }} (threshold: 2%)"
+
+      # High LLM latency (p95 > 10s, excluding model processing time)
+      - alert: HighLLMLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(llm_request_duration_seconds_bucket[5m])) by (le, model)
+          ) > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: gateway-api
+        annotations:
+          summary: "High LLM request latency (p95)"
+          description: "LLM p95 latency is {{ $value }}s for model {{ $labels.model }} (threshold: 10s)"
+
+      # Very high LLM latency (p95 > 30s)
+      - alert: VeryHighLLMLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(llm_request_duration_seconds_bucket[5m])) by (le, model)
+          ) > 30
+        for: 2m
+        labels:
+          severity: critical
+          service: gateway-api
+        annotations:
+          summary: "Very high LLM request latency (p95)"
+          description: "LLM p95 latency is {{ $value }}s for model {{ $labels.model }} (threshold: 30s)"
+
+      # LLM request rate drop (sudden 50% decrease)
+      - alert: LLMRequestRateDrop
+        expr: |
+          (
+            rate(llm_requests_total[1m])
+            /
+            avg_over_time(rate(llm_requests_total[1m])[15m:1m])
+          ) < 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: gateway-api
+        annotations:
+          summary: "LLM request rate drop detected"
+          description: "Current request rate is only {{ $value | humanizePercentage }} of the 15-minute average"
+
+      # No LLM requests (service might be down or no traffic)
+      - alert: NoLLMRequests
+        expr: |
+          rate(llm_requests_total[10m]) == 0
+        for: 10m
+        labels:
+          severity: warning
+          service: gateway-api
+        annotations:
+          summary: "No LLM requests detected"
+          description: "No LLM requests received in the last 10 minutes."
+
+      # High token usage (cost monitoring)
+      - alert: HighTokenUsage
+        expr: |
+          rate(llm_gateway_token_usage_total[5m]) > 100000
+        for: 5m
+        labels:
+          severity: warning
+          service: gateway-api
+        annotations:
+          summary: "High token usage rate detected"
+          description: "Token usage rate is {{ $value }} tokens/sec (threshold: 100k/sec)"
+
+      # Model-specific high error rate
+      - alert: ModelHighErrorRate
+        expr: |
+          (
+            sum(rate(llm_requests_total{status="error"}[5m])) by (model)
+            /
+            sum(rate(llm_requests_total[5m])) by (model)
+          ) * 100 > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: gateway-api
+        annotations:
+          summary: "High error rate for specific model"
+          description: "Model {{ $labels.model }} has {{ $value | humanizePercentage }} error rate (threshold: 10%)"
