@@ -11,6 +11,8 @@ from .models import LLMLog, LLMEvaluation
 from .schemas import (
     ChatRequest,
     ChatResponse,
+    TokenUsage,
+    CostInfo,
     DashboardSummary,
     LogListResponse,
     LogListItem,
@@ -35,6 +37,7 @@ from .metrics import (
     record_db_query,
     record_log_saved,
 )
+from .cost_utils import get_model_pricing, calculate_cost
 
 # 최초 실행 시 테이블 생성 (간단 버전)
 Base.metadata.create_all(bind=engine)
@@ -80,9 +83,9 @@ def chat(request: ChatRequest, db: Session = Depends(get_db)):
     # 실제로 사용할 모델 이름 계산
     used_model = resolve_model_version(request.model_version)
 
-    # LLM 호출 (사용할 모델 명을 넘겨줌)
+    # LLM 호출 (v0.7.0: usage 정보 포함)
     llm_start = time.time()
-    response_text, latency_ms = call_llm(request.prompt, used_model)
+    llm_result = call_llm(request.prompt, used_model)
     llm_duration = time.time() - llm_start
 
     # LLM 메트릭 기록
@@ -92,15 +95,41 @@ def chat(request: ChatRequest, db: Session = Depends(get_db)):
         duration_seconds=llm_duration
     )
 
-    # DB 로그 저장
+    # 비용 계산 (v0.7.0)
+    usage = llm_result["usage"]
+    pricing = get_model_pricing(db, used_model)
+
+    cost_input = None
+    cost_output = None
+    cost_total = None
+
+    if pricing:
+        cost_input, cost_output, cost_total = calculate_cost(
+            input_tokens=usage["input_tokens"],
+            output_tokens=usage["output_tokens"],
+            cached_tokens=usage["cached_tokens"],
+            pricing=pricing
+        )
+
+    # DB 로그 저장 (v0.7.0: token + cost 필드 추가)
     db_start = time.time()
     log = LLMLog(
         user_id=request.user_id,
         prompt=request.prompt,
-        response=response_text,
+        response=llm_result["response"],
         model_version=used_model,
-        latency_ms=latency_ms,
+        latency_ms=llm_result["latency_ms"],
         status="success",
+        # Token usage
+        input_tokens=usage["input_tokens"],
+        output_tokens=usage["output_tokens"],
+        total_tokens=usage["total_tokens"],
+        cached_tokens=usage["cached_tokens"],
+        reasoning_tokens=usage["reasoning_tokens"],
+        # Cost
+        cost_input_usd=cost_input,
+        cost_output_usd=cost_output,
+        cost_total_usd=cost_total,
     )
     db.add(log)
     db.commit()
@@ -111,11 +140,17 @@ def chat(request: ChatRequest, db: Session = Depends(get_db)):
     record_db_query(operation="insert", table="llm_logs", duration_seconds=db_duration)
     record_log_saved(status="success")
 
-    # 클라이언트 응답
+    # 클라이언트 응답 (v0.7.0: usage + cost 정보 추가)
     return ChatResponse(
-        response=response_text,
+        response=llm_result["response"],
         model_version=used_model,
-        latency_ms=latency_ms,
+        latency_ms=llm_result["latency_ms"],
+        usage=TokenUsage(**usage) if usage else None,
+        cost=CostInfo(
+            input_usd=cost_input,
+            output_usd=cost_output,
+            total_usd=cost_total
+        ) if cost_total else None,
     )
 
 

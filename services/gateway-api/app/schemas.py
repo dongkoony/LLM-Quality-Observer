@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 
 from pydantic import BaseModel
 
@@ -9,10 +10,28 @@ class ChatRequest(BaseModel):
     model_version: str | None = None
 
 
+class TokenUsage(BaseModel):
+    """Token usage information (v0.7.0)"""
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
+    cached_tokens: int = 0
+    reasoning_tokens: int = 0
+
+
+class CostInfo(BaseModel):
+    """Cost information in USD (v0.7.0)"""
+    input_usd: Decimal
+    output_usd: Decimal
+    total_usd: Decimal
+
+
 class ChatResponse(BaseModel):
     response: str
     model_version: str | None = None
     latency_ms: float | None = None
+    usage: TokenUsage | None = None
+    cost: CostInfo | None = None
 
 
 class LLMLogRead(BaseModel):
