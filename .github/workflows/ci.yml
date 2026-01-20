@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop, feat/** ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint:
+    name: Lint and Format Check
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install linting tools
+      run: |
+        pip install flake8 black isort
+
+    - name: Run flake8 on Gateway API
+      run: |
+        flake8 services/gateway-api/app --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 services/gateway-api/app --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    - name: Run flake8 on Evaluator
+      run: |
+        flake8 services/evaluator/app --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 services/evaluator/app --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    - name: Run flake8 on Dashboard
+      run: |
+        flake8 services/dashboard/app --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 services/dashboard/app --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    - name: Check formatting with black
+      run: |
+        black --check services/gateway-api/app services/evaluator/app services/dashboard/app || true
+
+  build:
+    name: Docker Build Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [gateway-api, evaluator, dashboard]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build ${{ matrix.service }}
+      run: |
+        docker build -t llm-quality-observer-${{ matrix.service }}:test services/${{ matrix.service }}
+      timeout-minutes: 15
+
+    - name: Test ${{ matrix.service }} container
+      run: |
+        docker images | grep llm-quality-observer-${{ matrix.service }}
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install uv
+      run: |
+        pip install uv
+
+    - name: Install Gateway API dependencies
+      working-directory: services/gateway-api
+      run: |
+        uv sync
+
+    - name: Install Evaluator dependencies
+      working-directory: services/evaluator
+      run: |
+        uv sync
+
+    - name: Run Gateway API tests
+      working-directory: services/gateway-api
+      run: |
+        # Currently no tests, placeholder for future
+        echo "No tests to run yet"
+
+    - name: Run Evaluator tests
+      working-directory: services/evaluator
+      run: |
+        # Currently no tests, placeholder for future
+        echo "No tests to run yet"
+
+  frontend-check:
+    name: Frontend Build Check
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install dependencies
+      working-directory: services/web/dashboard
+      run: |
+        npm ci
+
+    - name: Run TypeScript check
+      working-directory: services/web/dashboard
+      run: |
+        npx tsc --noEmit
+
+    - name: Build Next.js app
+      working-directory: services/web/dashboard
+      run: |
+        npm run build
+      env:
+        SKIP_ENV_VALIDATION: true

@@ -1,0 +1,107 @@
+groups:
+  - name: http_alerts
+    interval: 30s
+    rules:
+      # High HTTP error rate (>5%)
+      - alert: HighHTTPErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total[5m]))
+          ) * 100 > 5
+        for: 2m
+        labels:
+          severity: critical
+          service: gateway-api
+        annotations:
+          summary: "High HTTP 5xx error rate detected"
+          description: "HTTP 5xx error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+
+      # Moderate HTTP error rate (>2%)
+      - alert: ModerateHTTPErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total[5m]))
+          ) * 100 > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: gateway-api
+        annotations:
+          summary: "Moderate HTTP 5xx error rate detected"
+          description: "HTTP 5xx error rate is {{ $value | humanizePercentage }} (threshold: 2%)"
+
+      # High HTTP request latency (p95 > 5s)
+      - alert: HighHTTPLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, service)
+          ) > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: gateway-api
+        annotations:
+          summary: "High HTTP request latency (p95)"
+          description: "HTTP p95 latency is {{ $value }}s for service {{ $labels.service }} (threshold: 5s)"
+
+      # Very high HTTP request latency (p95 > 10s)
+      - alert: VeryHighHTTPLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, service)
+          ) > 10
+        for: 2m
+        labels:
+          severity: critical
+          service: gateway-api
+        annotations:
+          summary: "Very high HTTP request latency (p95)"
+          description: "HTTP p95 latency is {{ $value }}s for service {{ $labels.service }} (threshold: 10s)"
+
+      # High 4xx error rate (>10%)
+      - alert: HighHTTP4xxRate
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"4.."}[5m]))
+            /
+            sum(rate(http_requests_total[5m]))
+          ) * 100 > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: gateway-api
+        annotations:
+          summary: "High HTTP 4xx error rate detected"
+          description: "HTTP 4xx error rate is {{ $value | humanizePercentage }} (threshold: 10%)"
+
+      # HTTP request rate spike (sudden 3x increase)
+      - alert: HTTPRequestRateSpike
+        expr: |
+          (
+            rate(http_requests_total[1m])
+            /
+            avg_over_time(rate(http_requests_total[1m])[15m:1m])
+          ) > 3
+        for: 2m
+        labels:
+          severity: warning
+          service: gateway-api
+        annotations:
+          summary: "HTTP request rate spike detected"
+          description: "Current request rate is {{ $value }}x the 15-minute average"
+
+      # No HTTP requests (service might be down)
+      - alert: NoHTTPRequests
+        expr: |
+          rate(http_requests_total[5m]) == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: gateway-api
+        annotations:
+          summary: "No HTTP requests detected"
+          description: "No HTTP requests received in the last 5 minutes. Service might be down."

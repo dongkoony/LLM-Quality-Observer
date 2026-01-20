@@ -1,64 +1,56 @@
-from dataclasses import dataclass
+from .models import LLMLog
+from .schemas import EvaluationResult
 
 
-@dataclass
-class EvalConfig:
-    min_length: int = 10
-    max_length: int = 2000
-    forbidden_terms: tuple[str, ...] = (
-        "forbidden_example",
-        "badword",
+def basic_rule_evaluate(log: LLMLog) -> EvaluationResult:
+    """
+    간단한 룰 기반 평가 함수.
+    OpenAI API를 호출하지 않고, 순수 룰만으로 LLM 응답을 평가함.
+
+    평가 기준:
+    1. 응답 길이가 너무 짧으면 점수 낮춤
+    2. 에러 관련 키워드가 포함되면 플래그 처리
+    3. 그 외에는 정상으로 판단
+
+    Args:
+        log: 평가할 LLMLog 인스턴스
+
+    Returns:
+        EvaluationResult: 평가 결과 (점수, 라벨, 코멘트 등)
+    """
+    response_text = log.response or ""
+    response_length = len(response_text)
+
+    # 기본값 설정
+    overall_score = 5
+    is_flagged = False
+    label = "ok"
+    comment = "Looks fine by basic rules."
+
+    # 룰 1: 응답 길이 체크
+    if response_length < 30:
+        overall_score = 2
+        label = "too_short"
+        comment = f"Response is too short (length: {response_length} chars)."
+
+    # 룰 2: 에러 관련 키워드 감지
+    error_keywords = ["error", "exception", "traceback", "failed", "stack overflow"]
+    response_lower = response_text.lower()
+
+    detected_keywords = [kw for kw in error_keywords if kw in response_lower]
+
+    if detected_keywords:
+        overall_score = 1
+        is_flagged = True
+        label = "error_like"
+        comment = f"Response looks like an error message. Detected keywords: {', '.join(detected_keywords)}"
+
+    # 평가 결과 반환
+    return EvaluationResult(
+        log_id=log.id,
+        overall_score=overall_score,
+        is_flagged=is_flagged,
+        label=label,
+        judge_model="rule-basic-v1",
+        comment=comment,
     )
-
-
-def compute_rule_score(response: str, config: EvalConfig | None = None) -> float:
-    """
-    아주 단순한 룰 기반 스코어:
-    - 길이 체크
-    - 금지어 포함 여부
-    """
-    if config is None:
-        config = EvalConfig()
-
-    text = response or ""
-    length = len(text)
-
-    if length == 0:
-        return 0.0
-
-    score = 1.0
-
-    # 길이 너무 짧거나 긴 경우 페널티
-    if length < config.min_length:
-        score -= 0.4
-    if length > config.max_length:
-        score -= 0.2
-
-    # 금지어 포함 시 페널티
-    lowered = text.lower()
-    for term in config.forbidden_terms:
-        if term.lower() in lowered:
-            score -= 0.5
-            break
-
-    # 0 ~ 1로 클램프
-    if score < 0.0:
-        score = 0.0
-    if score > 1.0:
-        score = 1.0
-
-    return score
-
-
-def label_from_score(score: float) -> str:
-    """
-    간단한 라벨링 규칙:
-    - score >= 0.8  -> GOOD
-    - 0.5 <= score < 0.8 -> WARN
-    - score < 0.5 -> BAD
-    """
-    if score >= 0.8:
-        return "GOOD"
-    if score >= 0.5:
-        return "WARN"
-    return "BAD"

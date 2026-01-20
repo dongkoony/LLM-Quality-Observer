@@ -1,0 +1,205 @@
+groups:
+  - name: system_alerts
+    interval: 30s
+    rules:
+      # Database query latency (p95 > 1s)
+      - alert: HighDatabaseLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(db_query_duration_seconds_bucket[5m])) by (le, operation)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "High database query latency (p95)"
+          description: "Database p95 latency for {{ $labels.operation }} is {{ $value }}s (threshold: 1s)"
+
+      # Very high database latency (p95 > 5s)
+      - alert: VeryHighDatabaseLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(db_query_duration_seconds_bucket[5m])) by (le, operation)
+          ) > 5
+        for: 2m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "Very high database query latency (p95)"
+          description: "Database p95 latency for {{ $labels.operation }} is {{ $value }}s (threshold: 5s)"
+
+      # Database connection errors
+      - alert: DatabaseConnectionErrors
+        expr: |
+          rate(db_errors_total{error_type="connection"}[5m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "Database connection errors detected"
+          description: "Database connection errors occurring at {{ $value }}/sec"
+
+      # Notification delivery failures (Slack)
+      - alert: SlackNotificationFailures
+        expr: |
+          (
+            sum(rate(notifications_sent_total{channel="slack",status="error"}[5m]))
+            /
+            sum(rate(notifications_sent_total{channel="slack"}[5m]))
+          ) * 100 > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: evaluator
+        annotations:
+          summary: "High Slack notification failure rate"
+          description: "Slack notification failure rate is {{ $value | humanizePercentage }} (threshold: 10%)"
+
+      # Notification delivery failures (Discord)
+      - alert: DiscordNotificationFailures
+        expr: |
+          (
+            sum(rate(notifications_sent_total{channel="discord",status="error"}[5m]))
+            /
+            sum(rate(notifications_sent_total{channel="discord"}[5m]))
+          ) * 100 > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: evaluator
+        annotations:
+          summary: "High Discord notification failure rate"
+          description: "Discord notification failure rate is {{ $value | humanizePercentage }} (threshold: 10%)"
+
+      # Notification delivery failures (Email)
+      - alert: EmailNotificationFailures
+        expr: |
+          (
+            sum(rate(notifications_sent_total{channel="email",status="error"}[5m]))
+            /
+            sum(rate(notifications_sent_total{channel="email"}[5m]))
+          ) * 100 > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: evaluator
+        annotations:
+          summary: "High email notification failure rate"
+          description: "Email notification failure rate is {{ $value | humanizePercentage }} (threshold: 10%)"
+
+      # Service down (no metrics collected)
+      - alert: GatewayAPIDown
+        expr: |
+          up{job="gateway-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: gateway-api
+        annotations:
+          summary: "Gateway API service is down"
+          description: "Gateway API is not responding to Prometheus scrapes"
+
+      - alert: EvaluatorDown
+        expr: |
+          up{job="evaluator"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: evaluator
+        annotations:
+          summary: "Evaluator service is down"
+          description: "Evaluator service is not responding to Prometheus scrapes"
+
+      - alert: DashboardDown
+        expr: |
+          up{job="dashboard"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: dashboard
+        annotations:
+          summary: "Dashboard service is down"
+          description: "Dashboard service is not responding to Prometheus scrapes"
+
+      # Metrics scrape failures
+      - alert: MetricsScrapeFailures
+        expr: |
+          up == 0
+        for: 3m
+        labels:
+          severity: warning
+          service: prometheus
+        annotations:
+          summary: "Prometheus scrape failures detected"
+          description: "Prometheus cannot scrape metrics from {{ $labels.job }} ({{ $labels.instance }})"
+
+      # High memory usage (if available)
+      - alert: HighMemoryUsage
+        expr: |
+          process_resident_memory_bytes > 2e9
+        for: 10m
+        labels:
+          severity: warning
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "High memory usage detected"
+          description: "Service {{ $labels.job }} is using {{ $value | humanize }}B of memory (threshold: 2GB)"
+
+      # Service restart detected
+      - alert: ServiceRestarted
+        expr: |
+          rate(process_start_time_seconds[5m]) > 0
+        for: 1m
+        labels:
+          severity: info
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "Service restart detected"
+          description: "Service {{ $labels.job }} has restarted recently"
+
+      # Prometheus storage issues
+      - alert: PrometheusStorageNearlyFull
+        expr: |
+          (
+            prometheus_tsdb_storage_blocks_bytes
+            /
+            (prometheus_tsdb_storage_blocks_bytes + prometheus_tsdb_size_retentions_total)
+          ) > 0.9
+        for: 10m
+        labels:
+          severity: warning
+          service: prometheus
+        annotations:
+          summary: "Prometheus storage nearly full"
+          description: "Prometheus storage is {{ $value | humanizePercentage }} full (threshold: 90%)"
+
+      # Batch evaluation processing slow
+      - alert: SlowBatchProcessing
+        expr: |
+          scheduler_batch_evaluation_duration_seconds > 300
+        for: 5m
+        labels:
+          severity: warning
+          service: evaluator
+        annotations:
+          summary: "Batch evaluation processing is slow"
+          description: "Batch evaluation took {{ $value }}s to complete (threshold: 300s)"
+
+      # LLM judge request failures
+      - alert: LLMJudgeHighErrorRate
+        expr: |
+          (
+            sum(rate(llm_judge_requests_total{status="error"}[5m]))
+            /
+            sum(rate(llm_judge_requests_total[5m]))
+          ) * 100 > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: evaluator
+        annotations:
+          summary: "High LLM judge error rate"
+          description: "LLM judge error rate is {{ $value | humanizePercentage }} (threshold: 10%)"

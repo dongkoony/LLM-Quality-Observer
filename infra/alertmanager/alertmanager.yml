@@ -1,0 +1,115 @@
+global:
+  resolve_timeout: 5m
+  # Slack API URL (optional, can be set per receiver)
+  # slack_api_url: 'YOUR_SLACK_WEBHOOK_URL'
+
+# Route configuration
+route:
+  # Group alerts by these labels
+  group_by: ['alertname', 'severity', 'service']
+
+  # How long to wait before sending a notification for a group of alerts
+  group_wait: 10s
+
+  # How long to wait before sending another notification for an existing group
+  group_interval: 5m
+
+  # How long to wait before re-sending an alert
+  repeat_interval: 3h
+
+  # Default receiver
+  receiver: 'default-receiver'
+
+  # Child routes
+  routes:
+    # Critical alerts - send to all channels immediately
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 5s
+      repeat_interval: 30m
+
+    # Warning alerts - send to standard channels
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+      group_wait: 30s
+      repeat_interval: 6h
+
+    # HTTP errors - send to ops team
+    - match:
+        alertname: HighHTTPErrorRate
+      receiver: 'ops-team'
+
+    # Evaluation quality issues - send to quality team
+    - match_re:
+        alertname: '(LowEvaluationScore|EvaluationScoreDrop)'
+      receiver: 'quality-team'
+
+# Receiver configurations
+receivers:
+  # Default receiver (console logs)
+  - name: 'default-receiver'
+    # Add webhook_configs if you want to send to a generic endpoint
+    # webhook_configs:
+    #   - url: 'http://your-webhook-endpoint'
+
+  # Critical alerts receiver (console logs only for local dev)
+  - name: 'critical-alerts'
+    # For production, uncomment and configure external receivers:
+    # slack_configs:
+    #   - api_url: 'YOUR_SLACK_WEBHOOK_URL_HERE'
+    #     channel: '#llm-alerts-critical'
+    #     title: '🚨 Critical Alert: {{ .GroupLabels.alertname }}'
+    #     text: |
+    #       *Summary:* {{ .CommonAnnotations.summary }}
+    #       *Description:* {{ .CommonAnnotations.description }}
+    #       *Severity:* {{ .CommonLabels.severity }}
+    #       *Service:* {{ .CommonLabels.service }}
+    #     send_resolved: true
+    # webhook_configs:
+    #   - url: 'YOUR_DISCORD_WEBHOOK_URL_HERE'
+    #     send_resolved: true
+    # email_configs:
+    #   - to: 'alerts@example.com'
+    #     from: 'llm-alertmanager@example.com'
+    #     smarthost: 'smtp.gmail.com:587'
+    #     auth_username: 'your-email@gmail.com'
+    #     auth_password: 'YOUR_APP_PASSWORD'
+
+  # Warning alerts receiver (console logs only for local dev)
+  - name: 'warning-alerts'
+    # For production, uncomment and configure:
+    # slack_configs:
+    #   - api_url: 'YOUR_SLACK_WEBHOOK_URL_HERE'
+    #     channel: '#llm-alerts-warning'
+
+  # Operations team receiver (console logs only for local dev)
+  - name: 'ops-team'
+    # For production, uncomment and configure:
+    # slack_configs:
+    #   - api_url: 'YOUR_SLACK_WEBHOOK_URL_HERE'
+    #     channel: '#llm-ops'
+
+  # Quality team receiver (console logs only for local dev)
+  - name: 'quality-team'
+    # For production, uncomment and configure:
+    # slack_configs:
+    #   - api_url: 'YOUR_SLACK_WEBHOOK_URL_HERE'
+    #     channel: '#llm-quality'
+
+# Inhibition rules (prevent duplicate alerts)
+inhibit_rules:
+  # Inhibit warning if critical alert is firing for the same service
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'service']
+
+  # Inhibit info if warning or critical is firing
+  - source_match_re:
+      severity: 'critical|warning'
+    target_match:
+      severity: 'info'
+    equal: ['alertname', 'service']

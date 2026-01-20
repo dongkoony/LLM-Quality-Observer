@@ -12,6 +12,11 @@ dependencies = [
     "pydantic>=2.0",
     "pydantic-settings",
     "openai",
+    "apscheduler>=3.10",
+    "httpx",
+    "prometheus-client>=0.19.0",
+    "aiosmtplib>=3.0",
+    "email-validator>=2.0",
 ]
 
 [build-system]

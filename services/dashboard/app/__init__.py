@@ -1,1 +1,1 @@
-# Empty file to mark this directory as a package.
+# Dashboard service package

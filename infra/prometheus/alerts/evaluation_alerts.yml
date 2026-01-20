@@ -1,0 +1,167 @@
+groups:
+  - name: evaluation_alerts
+    interval: 30s
+    rules:
+      # Low evaluation score (p50 < 3)
+      - alert: LowEvaluationScore
+        expr: |
+          histogram_quantile(0.50,
+            sum(rate(evaluation_score_bucket[10m])) by (le)
+          ) < 3
+        for: 10m
+        labels:
+          severity: critical
+          service: evaluator
+        annotations:
+          summary: "Low evaluation score detected (p50)"
+          description: "Median evaluation score is {{ $value }} (threshold: 3.0)"
+          score: "{{ $value }}"
+
+      # Evaluation score drop (sudden 20% decrease)
+      - alert: EvaluationScoreDrop
+        expr: |
+          (
+            avg_over_time(evaluation_score_total[5m])
+            /
+            avg_over_time(evaluation_score_total[30m] offset 30m)
+          ) < 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: evaluator
+        annotations:
+          summary: "Evaluation score drop detected"
+          description: "Current score is {{ $value | humanizePercentage }} of the baseline (30min ago)"
+
+      # Very low evaluation score (p50 < 2)
+      - alert: VeryLowEvaluationScore
+        expr: |
+          histogram_quantile(0.50,
+            sum(rate(evaluation_score_bucket[10m])) by (le)
+          ) < 2
+        for: 5m
+        labels:
+          severity: critical
+          service: evaluator
+        annotations:
+          summary: "Very low evaluation score detected (p50)"
+          description: "Median evaluation score is {{ $value }} (threshold: 2.0)"
+          score: "{{ $value }}"
+
+      # Pending logs spike (>100)
+      - alert: HighPendingLogs
+        expr: |
+          scheduler_pending_logs > 100
+        for: 10m
+        labels:
+          severity: warning
+          service: evaluator
+        annotations:
+          summary: "High number of pending logs for evaluation"
+          description: "{{ $value }} logs are pending evaluation (threshold: 100)"
+
+      # Very high pending logs (>500)
+      - alert: VeryHighPendingLogs
+        expr: |
+          scheduler_pending_logs > 500
+        for: 5m
+        labels:
+          severity: critical
+          service: evaluator
+        annotations:
+          summary: "Very high number of pending logs for evaluation"
+          description: "{{ $value }} logs are pending evaluation (threshold: 500). Evaluation service may be struggling."
+
+      # Evaluation rate drop
+      - alert: EvaluationRateDrop
+        expr: |
+          rate(evaluations_total[5m]) < 0.01
+        for: 10m
+        labels:
+          severity: warning
+          service: evaluator
+        annotations:
+          summary: "Evaluation rate is very low"
+          description: "Evaluation rate is {{ $value }} evals/sec (threshold: 0.01/sec)"
+
+      # No evaluations running
+      - alert: NoEvaluationsRunning
+        expr: |
+          rate(evaluations_total[10m]) == 0
+        for: 10m
+        labels:
+          severity: critical
+          service: evaluator
+        annotations:
+          summary: "No evaluations running"
+          description: "No evaluations have been completed in the last 10 minutes. Evaluator may be down."
+
+      # High evaluation error rate (>5%)
+      - alert: HighEvaluationErrorRate
+        expr: |
+          (
+            sum(rate(evaluations_total{status="error"}[5m]))
+            /
+            sum(rate(evaluations_total[5m]))
+          ) * 100 > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: evaluator
+        annotations:
+          summary: "High evaluation error rate detected"
+          description: "Evaluation error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+
+      # Scheduler failure detection
+      - alert: SchedulerNotRunning
+        expr: |
+          time() - scheduler_last_run_timestamp > 7200
+        for: 5m
+        labels:
+          severity: critical
+          service: evaluator
+        annotations:
+          summary: "Evaluation scheduler has not run recently"
+          description: "Scheduler last ran {{ $value }} seconds ago (threshold: 2 hours)"
+
+      # High evaluation latency
+      - alert: HighEvaluationLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(evaluation_duration_seconds_bucket[5m])) by (le)
+          ) > 30
+        for: 5m
+        labels:
+          severity: warning
+          service: evaluator
+        annotations:
+          summary: "High evaluation latency (p95)"
+          description: "Evaluation p95 latency is {{ $value }}s (threshold: 30s)"
+
+      # Low quality notifications sent (many low-quality responses)
+      - alert: HighLowQualityRate
+        expr: |
+          rate(notifications_sent_total{channel="quality"}[10m]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          service: evaluator
+        annotations:
+          summary: "High rate of low-quality notifications"
+          description: "Low-quality notifications are being sent at {{ $value }}/sec (threshold: 0.1/sec)"
+
+      # Specific judge type failures
+      - alert: JudgeTypeHighErrorRate
+        expr: |
+          (
+            sum(rate(evaluations_total{status="error"}[5m])) by (judge_type)
+            /
+            sum(rate(evaluations_total[5m])) by (judge_type)
+          ) * 100 > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: evaluator
+        annotations:
+          summary: "High error rate for specific judge type"
+          description: "Judge type {{ $labels.judge_type }} has {{ $value | humanizePercentage }} error rate (threshold: 10%)"
