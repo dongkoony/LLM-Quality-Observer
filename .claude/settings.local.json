@@ -40,7 +40,8 @@
       "WebSearch",
       "Bash(git checkout:*)",
       "Bash(git reset:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(bash:*)"
     ],
     "deny": [],
     "ask": []

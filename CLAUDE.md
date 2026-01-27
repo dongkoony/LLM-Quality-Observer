@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-LLM-Quality-Observer is a microservices-based MLOps platform for monitoring and evaluating LLM response quality. The system logs LLM interactions, evaluates them using rule-based and LLM-as-a-judge approaches, and provides dashboards for visualization and monitoring.
+LLM-Quality-Observer is a microservices-based MLOps platform for monitoring and evaluating LLM response quality. The system logs LLM interactions, evaluates them using rule-based and LLM-as-a-judge approaches, provides cost tracking and token usage monitoring, and offers dashboards for visualization and monitoring.
 
-Current status: v0.5.0 with Gateway API + Evaluator + Dashboard + Prometheus + Grafana operational.
+Current status: v0.7.0 with Gateway API + Evaluator + Dashboard + Prometheus + Grafana + Cost Tracking + LiteLLM Multi-Model Support operational.
 
 ## Architecture
 
@@ -18,12 +18,12 @@ Client → Gateway API → Postgres ← Evaluator Service
          Dashboard    Prometheus → Grafana
 ```
 
-- **Gateway API** (port 18000): FastAPI service that receives chat requests, calls OpenAI GPT-5 mini, logs to database, exposes Prometheus metrics
+- **Gateway API** (port 18000): FastAPI service that receives chat requests, calls LLMs via LiteLLM (supports OpenAI, Anthropic, etc.), tracks token usage and costs, logs to database, exposes Prometheus metrics and cost analysis APIs
 - **Evaluator Service** (port 18001): Batch evaluation service that scores LLM outputs using rule-based and LLM-as-a-judge methods, sends notifications (Slack/Discord/Email), exposes Prometheus metrics
 - **Dashboard Service** (port 8501): Streamlit UI for visualizing quality metrics, latency distributions, and error rates
 - **Postgres** (port 5432): PostgreSQL 16 database with `llm_logs` and `llm_evaluations` tables
 - **Prometheus** (port 9090): Metrics collection and time-series database
-- **Grafana** (port 3000): Monitoring dashboards and visualization platform
+- **Grafana** (port 13000): Monitoring dashboards and visualization platform
 
 ## Common Commands
 
@@ -88,7 +88,13 @@ curl http://localhost:18001/metrics
 # Open browser to http://localhost:9090
 
 # View Grafana Dashboard
-# Open browser to http://localhost:3000 (admin/admin)
+# Open browser to http://localhost:13000 (admin/admin)
+
+# Cost Analysis APIs (v0.7.0+)
+curl "http://localhost:18000/cost/summary"
+curl "http://localhost:18000/cost/trends?hours=24"
+curl "http://localhost:18000/cost/models?days=7"
+curl "http://localhost:18000/models/pricing"
 ```
 
 ### Dependency Management
@@ -114,19 +120,35 @@ uv sync --upgrade
 
 **Entry point**: `app/main.py`
 - `/health`: Health check endpoint
-- `/chat`: Main LLM endpoint that accepts ChatRequest and returns ChatResponse
+- `/chat`: Main LLM endpoint that accepts ChatRequest and returns ChatResponse (with token/cost info in v0.7.0+)
 - `/metrics`: Prometheus metrics endpoint
+- `/cost/summary`: Cost analysis by user/model (v0.7.0+)
+- `/cost/trends`: Time-series cost trends (v0.7.0+)
+- `/cost/models`: Model cost efficiency analysis (v0.7.0+)
+- `/models/pricing`: Model pricing information (v0.7.0+)
 
-**LLM Client** (`app/llm_client.py`):
-- Uses OpenAI Python SDK's `client.responses.create()` API (not the standard chat completions API)
+**LLM Client** (`app/llm_client.py`) - v0.7.0:
+- Uses LiteLLM for multi-provider support (OpenAI, Anthropic, etc.)
+- Supports automatic fallback to alternative models on failure
 - Model resolution: Falls back to `OPENAI_MODEL_MAIN` env var if no model specified
-- Returns tuple of `(response_text, latency_ms)`
+- Returns dict with `response`, `model_version`, `latency_ms`, and `usage` (token info)
 - Timing measured using `time.perf_counter()`
+- Fallback models: `FALLBACK_MODELS` config (default: ["gpt-4o-mini", "claude-haiku-4"])
 
-**Database** (`app/db.py`, `app/models.py`):
-- SQLAlchemy ORM with `LLMLog` model
+**Database** (`app/db.py`, `app/models.py`) - v0.7.0:
+- SQLAlchemy ORM with `LLMLog` and `LLMModelPricing` models
 - Tables auto-created on startup via `Base.metadata.create_all(bind=engine)`
-- Fields: id, created_at, user_id, prompt, response, model_version, latency_ms, status
+- `LLMLog` fields:
+  - Base: id, created_at, user_id, prompt, response, model_version, latency_ms, status
+  - Token usage (v0.7.0): input_tokens, output_tokens, total_tokens, cached_tokens, reasoning_tokens
+  - Cost (v0.7.0): cost_input_usd, cost_output_usd, cost_total_usd
+- `LLMModelPricing` table (v0.7.0): model_name, provider, price_input_per_1m, price_output_per_1m, price_cached_per_1m, context_window, is_active, etc.
+
+**Cost Calculation** (`app/cost_utils.py`) - v0.7.0:
+- `get_model_pricing(db, model_name)`: Queries pricing from database
+- `calculate_cost(input_tokens, output_tokens, cached_tokens, pricing)`: Calculates USD cost
+- Formula: (uncached_input * price_input + cached * price_cached + output * price_output) / 1,000,000
+- Uses DECIMAL(10, 6) for precision
 
 **Configuration** (`app/config.py`):
 - Pydantic Settings loading from environment variables
@@ -215,7 +237,7 @@ uv sync --upgrade
 - Auto-provisioned Prometheus datasource
 - Pre-configured LLM Quality Observer dashboard
 - Dashboard JSON: `infra/grafana/dashboards/llm-quality-observer.json`
-- Web UI accessible at http://localhost:3000 (admin/admin)
+- Web UI accessible at http://localhost:13000 (admin/admin)
 
 **Dashboard Panels** (14 panels total):
 - Overview stats: request rate, evaluation rate, pending logs, notification rate
@@ -281,7 +303,7 @@ Docker Compose (`infra/docker/docker-compose.local.yml`):
   - Evaluator: 18001
   - Dashboard: 8501
   - Prometheus: 9090
-  - Grafana: 3000
+  - Grafana: 13000
   - Postgres: 5432
 
 ## Development Workflow

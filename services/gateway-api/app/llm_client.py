@@ -1,14 +1,13 @@
 import time
-
-from openai import OpenAI
+import os
+from litellm import completion
 
 from .config import settings
 
-# 전역 클라이언트 한 번만 생성
-client = OpenAI(
-    api_key=settings.llm_api_key,
-    base_url=settings.llm_api_base_url or None,
-)
+# LiteLLM 설정
+os.environ["OPENAI_API_KEY"] = settings.llm_api_key or ""
+if settings.llm_api_base_url:
+    os.environ["OPENAI_API_BASE"] = settings.llm_api_base_url
 
 
 def _resolve_model(model_version: str | None) -> str:
@@ -28,7 +27,7 @@ def _resolve_model(model_version: str | None) -> str:
 
 def call_llm(prompt: str, model_version: str | None = None) -> dict:
     """
-    LLM 호출 및 토큰 정보 추출 (v0.7.0)
+    LLM 호출 및 토큰 정보 추출 (v0.7.0 Phase 4 - LiteLLM 사용)
 
     Returns:
         {
@@ -45,29 +44,47 @@ def call_llm(prompt: str, model_version: str | None = None) -> dict:
         }
     """
     model = _resolve_model(model_version)
+    models_to_try = [model] + settings.fallback_models
 
-    start = time.perf_counter()
+    last_error = None
 
-    response = client.responses.create(
-        model=model,
-        input=prompt,
-    )
+    for attempt_model in models_to_try:
+        try:
+            start = time.perf_counter()
 
-    text = response.output_text
-    elapsed_ms = (time.perf_counter() - start) * 1000.0
+            # LiteLLM completion 호출
+            response = completion(
+                model=attempt_model,
+                messages=[{"role": "user", "content": prompt}],
+                timeout=settings.llm_timeout_seconds,
+            )
 
-    # Extract token usage (v0.7.0)
-    usage = {
-        "input_tokens": getattr(response.usage, "input_tokens", 0),
-        "output_tokens": getattr(response.usage, "output_tokens", 0),
-        "total_tokens": getattr(response.usage, "total_tokens", 0),
-        "cached_tokens": getattr(response.usage, "cached_tokens", 0),
-        "reasoning_tokens": getattr(response.usage, "reasoning_tokens", 0),
-    }
+            elapsed_ms = (time.perf_counter() - start) * 1000.0
 
-    return {
-        "response": text,
-        "model_version": model,
-        "latency_ms": elapsed_ms,
-        "usage": usage,
-    }
+            # 응답 텍스트 추출
+            text = response.choices[0].message.content
+
+            # 토큰 사용량 추출
+            usage_obj = response.usage
+            usage = {
+                "input_tokens": getattr(usage_obj, "prompt_tokens", 0),
+                "output_tokens": getattr(usage_obj, "completion_tokens", 0),
+                "total_tokens": getattr(usage_obj, "total_tokens", 0),
+                "cached_tokens": getattr(usage_obj, "cache_read_input_tokens", 0),
+                "reasoning_tokens": getattr(usage_obj, "reasoning_tokens", 0),
+            }
+
+            return {
+                "response": text,
+                "model_version": attempt_model,
+                "latency_ms": elapsed_ms,
+                "usage": usage,
+            }
+
+        except Exception as e:
+            print(f"[LiteLLM] Model {attempt_model} failed: {e}")
+            last_error = e
+            continue
+
+    # 모든 모델 실패 시
+    raise Exception(f"All models failed. Last error: {last_error}")
