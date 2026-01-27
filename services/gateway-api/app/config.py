@@ -6,9 +6,13 @@ class Settings(BaseSettings):
 
     database_url: str
     openai_model_main: str = "gpt-5-mini"
-    
+
     llm_api_base_url: str | None = None
     llm_api_key: str | None = None
+
+    # Fallback models (v0.7.0 Phase 4)
+    fallback_models: list[str] = ["gpt-4o-mini", "claude-haiku-4"]
+    llm_timeout_seconds: int = 30
 
     log_level: str = "INFO"
 

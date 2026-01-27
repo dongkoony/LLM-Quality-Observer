@@ -7,7 +7,7 @@ import time
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 
 from .db import Base, engine, get_db
-from .models import LLMLog, LLMEvaluation
+from .models import LLMLog, LLMEvaluation, LLMModelPricing
 from .schemas import (
     ChatRequest,
     ChatResponse,
@@ -28,6 +28,15 @@ from .schemas import (
     ModelComparisonDetail,
     AlertHistoryResponse,
     AlertInfo,
+    CostSummaryResponse,
+    ModelBreakdown,
+    UserBreakdown,
+    CostTrendResponse,
+    CostTrendDataPoint,
+    ModelCostResponse,
+    ModelCostEfficiency,
+    ModelPricingResponse,
+    ModelPricingInfo,
 )
 from .llm_client import call_llm
 from .config import settings
@@ -698,3 +707,278 @@ def get_alert_history(
         page_size=page_size,
         total_pages=total_pages,
     )
+
+
+# ==================== Cost Analysis API (v0.7.0 Phase 3) ====================
+
+
+@app.get("/cost/summary", response_model=CostSummaryResponse)
+def get_cost_summary(
+    user_id: str | None = Query(None, description="특정 사용자 필터"),
+    model_version: str | None = Query(None, description="특정 모델 필터"),
+    start_date: str | None = Query(None, description="시작 날짜 (YYYY-MM-DD)"),
+    end_date: str | None = Query(None, description="종료 날짜 (YYYY-MM-DD)"),
+    db: Session = Depends(get_db),
+):
+    """
+    사용자별/모델별 비용 요약 조회.
+    지정된 기간 동안의 총 비용, 토큰 사용량, 모델별/사용자별 분석을 반환.
+    """
+    from datetime import datetime
+    from decimal import Decimal
+
+    # 기본 쿼리
+    query = db.query(LLMLog).filter(LLMLog.cost_total_usd.isnot(None))
+
+    # 필터 적용
+    if user_id:
+        query = query.filter(LLMLog.user_id == user_id)
+    if model_version:
+        query = query.filter(LLMLog.model_version == model_version)
+    if start_date:
+        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        query = query.filter(LLMLog.created_at >= start_dt)
+    if end_date:
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+        query = query.filter(LLMLog.created_at <= end_dt)
+
+    # 전체 통계
+    total_stats = query.with_entities(
+        func.sum(LLMLog.cost_total_usd).label("total_cost"),
+        func.count(LLMLog.id).label("total_requests"),
+        func.sum(LLMLog.input_tokens).label("total_input_tokens"),
+        func.sum(LLMLog.output_tokens).label("total_output_tokens"),
+    ).first()
+
+    total_cost_usd = total_stats.total_cost or Decimal("0")
+    total_requests = total_stats.total_requests or 0
+    total_input_tokens = total_stats.total_input_tokens or 0
+    total_output_tokens = total_stats.total_output_tokens or 0
+
+    # 모델별 분석
+    model_breakdown_query = (
+        query.with_entities(
+            LLMLog.model_version,
+            func.sum(LLMLog.cost_total_usd).label("cost_usd"),
+            func.count(LLMLog.id).label("requests"),
+        )
+        .group_by(LLMLog.model_version)
+        .all()
+    )
+
+    breakdown_by_model = [
+        ModelBreakdown(
+            model_version=row.model_version or "unknown",
+            cost_usd=row.cost_usd or Decimal("0"),
+            requests=row.requests,
+            avg_cost_per_request=(row.cost_usd / row.requests) if row.requests > 0 else Decimal("0"),
+        )
+        for row in model_breakdown_query
+    ]
+
+    # 사용자별 분석 (user_id가 None이 아닌 것만)
+    user_breakdown_query = (
+        query.filter(LLMLog.user_id.isnot(None))
+        .with_entities(
+            LLMLog.user_id,
+            func.sum(LLMLog.cost_total_usd).label("cost_usd"),
+            func.count(LLMLog.id).label("requests"),
+        )
+        .group_by(LLMLog.user_id)
+        .all()
+    )
+
+    breakdown_by_user = [
+        UserBreakdown(
+            user_id=row.user_id,
+            cost_usd=row.cost_usd or Decimal("0"),
+            requests=row.requests,
+        )
+        for row in user_breakdown_query
+    ]
+
+    return CostSummaryResponse(
+        total_cost_usd=total_cost_usd,
+        total_requests=total_requests,
+        total_input_tokens=total_input_tokens,
+        total_output_tokens=total_output_tokens,
+        breakdown_by_model=breakdown_by_model,
+        breakdown_by_user=breakdown_by_user,
+    )
+
+
+@app.get("/cost/trends", response_model=CostTrendResponse)
+def get_cost_trends(
+    granularity: str = Query("hour", regex="^(hour|day|week|month)$", description="시간 단위"),
+    hours: int | None = Query(None, ge=1, le=720, description="조회할 시간 (최대 30일)"),
+    days: int | None = Query(None, ge=1, le=90, description="조회할 일수 (최대 90일)"),
+    db: Session = Depends(get_db),
+):
+    """
+    시간별 비용 추이 조회.
+    지정된 시간 단위로 비용, 요청 수, 토큰 사용량을 반환.
+    """
+    from datetime import datetime, timedelta
+    from sqlalchemy import func as sql_func
+
+    # 조회 기간 계산
+    if hours:
+        start_time = datetime.now() - timedelta(hours=hours)
+    elif days:
+        start_time = datetime.now() - timedelta(days=days)
+    else:
+        start_time = datetime.now() - timedelta(hours=24)  # 기본값: 24시간
+
+    # PostgreSQL date_trunc 함수 사용
+    if granularity == "hour":
+        time_bucket = sql_func.date_trunc('hour', LLMLog.created_at)
+    elif granularity == "day":
+        time_bucket = sql_func.date_trunc('day', LLMLog.created_at)
+    elif granularity == "week":
+        time_bucket = sql_func.date_trunc('week', LLMLog.created_at)
+    else:  # month
+        time_bucket = sql_func.date_trunc('month', LLMLog.created_at)
+
+    # 시간별 통계 조회
+    trend_data = (
+        db.query(
+            time_bucket.label("timestamp"),
+            sql_func.sum(LLMLog.cost_total_usd).label("cost_usd"),
+            sql_func.count(LLMLog.id).label("requests"),
+            sql_func.sum(LLMLog.input_tokens).label("input_tokens"),
+            sql_func.sum(LLMLog.output_tokens).label("output_tokens"),
+        )
+        .filter(
+            LLMLog.created_at >= start_time,
+            LLMLog.cost_total_usd.isnot(None)
+        )
+        .group_by(time_bucket)
+        .order_by(time_bucket)
+        .all()
+    )
+
+    data_points = [
+        CostTrendDataPoint(
+            timestamp=row.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+            cost_usd=row.cost_usd or 0,
+            requests=row.requests,
+            input_tokens=row.input_tokens or 0,
+            output_tokens=row.output_tokens or 0,
+        )
+        for row in trend_data
+    ]
+
+    return CostTrendResponse(data=data_points)
+
+
+@app.get("/cost/models", response_model=ModelCostResponse)
+def get_model_cost_efficiency(
+    days: int = Query(7, ge=1, le=30, description="분석 기간 (일)"),
+    db: Session = Depends(get_db),
+):
+    """
+    모델별 비용 효율성 분석.
+    각 모델의 평균 비용, 품질 점수, 비용 대비 효율성을 반환.
+    """
+    from datetime import datetime, timedelta
+    from decimal import Decimal
+
+    start_date = datetime.now() - timedelta(days=days)
+
+    # 모델별 비용 통계
+    model_cost_stats = (
+        db.query(
+            LLMLog.model_version,
+            func.count(LLMLog.id).label("total_requests"),
+            func.avg(LLMLog.cost_total_usd).label("avg_cost_per_request"),
+        )
+        .filter(
+            LLMLog.created_at >= start_date,
+            LLMLog.cost_total_usd.isnot(None)
+        )
+        .group_by(LLMLog.model_version)
+        .all()
+    )
+
+    models = []
+    for row in model_cost_stats:
+        model_version = row.model_version or "unknown"
+
+        # 해당 모델의 평균 품질 점수
+        avg_quality = (
+            db.query(func.avg(LLMEvaluation.overall_score))
+            .join(LLMLog, LLMEvaluation.log_id == LLMLog.id)
+            .filter(
+                LLMLog.model_version == row.model_version,
+                LLMLog.created_at >= start_date
+            )
+            .scalar()
+        )
+
+        # 비용 대비 효율성 계산
+        avg_cost = row.avg_cost_per_request or Decimal("0")
+        cost_per_quality_point = None
+        recommendation = None
+
+        if avg_quality and avg_quality > 0 and avg_cost > 0:
+            cost_per_quality_point = avg_cost / Decimal(str(avg_quality))
+
+            # 추천 로직
+            if cost_per_quality_point < Decimal("0.003") and avg_quality >= 4.0:
+                recommendation = "최고 가성비 모델"
+            elif avg_quality >= 4.5:
+                recommendation = "최고 품질 모델"
+            elif avg_cost < Decimal("0.001"):
+                recommendation = "최저 비용 모델"
+
+        models.append(
+            ModelCostEfficiency(
+                model_version=model_version,
+                avg_cost_per_request=avg_cost,
+                avg_quality_score=avg_quality,
+                cost_per_quality_point=cost_per_quality_point,
+                recommendation=recommendation,
+            )
+        )
+
+    # 가성비 순으로 정렬 (낮을수록 좋음)
+    models.sort(key=lambda m: m.cost_per_quality_point or Decimal("999"), reverse=False)
+
+    return ModelCostResponse(models=models)
+
+
+@app.get("/models/pricing", response_model=ModelPricingResponse)
+def get_model_pricing_info(
+    provider: str | None = Query(None, description="제공자 필터 (openai, anthropic 등)"),
+    is_active: bool | None = Query(None, description="활성 상태 필터"),
+    db: Session = Depends(get_db),
+):
+    """
+    등록된 모델 가격 정보 조회.
+    모든 모델의 입력/출력 토큰 가격, 컨텍스트 크기 등을 반환.
+    """
+    query = db.query(LLMModelPricing)
+
+    if provider:
+        query = query.filter(LLMModelPricing.provider == provider)
+    if is_active is not None:
+        query = query.filter(LLMModelPricing.is_active == is_active)
+
+    pricing_data = query.order_by(LLMModelPricing.provider, LLMModelPricing.model_name).all()
+
+    models = [
+        ModelPricingInfo(
+            model_name=row.model_name,
+            provider=row.provider,
+            price_input_per_1m=row.price_input_per_1m,
+            price_output_per_1m=row.price_output_per_1m,
+            price_cached_per_1m=row.price_cached_per_1m,
+            context_window=row.context_window,
+            max_output_tokens=row.max_output_tokens,
+            is_active=row.is_active,
+            description=row.description,
+        )
+        for row in pricing_data
+    ]
+
+    return ModelPricingResponse(models=models)

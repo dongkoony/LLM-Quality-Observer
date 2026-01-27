@@ -203,3 +203,76 @@ class AlertHistoryResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
+
+
+# Cost Analysis API Schemas (v0.7.0 Phase 3)
+
+class ModelBreakdown(BaseModel):
+    """모델별 비용 분석"""
+    model_version: str
+    cost_usd: Decimal
+    requests: int
+    avg_cost_per_request: Decimal
+
+
+class UserBreakdown(BaseModel):
+    """사용자별 비용 분석"""
+    user_id: str
+    cost_usd: Decimal
+    requests: int
+
+
+class CostSummaryResponse(BaseModel):
+    """비용 요약 응답 (GET /cost/summary)"""
+    total_cost_usd: Decimal
+    total_requests: int
+    total_input_tokens: int
+    total_output_tokens: int
+    breakdown_by_model: list[ModelBreakdown]
+    breakdown_by_user: list[UserBreakdown]
+
+
+class CostTrendDataPoint(BaseModel):
+    """시간별 비용 데이터 포인트"""
+    timestamp: str  # YYYY-MM-DD HH:MM:SS
+    cost_usd: Decimal
+    requests: int
+    input_tokens: int
+    output_tokens: int
+
+
+class CostTrendResponse(BaseModel):
+    """비용 추이 응답 (GET /cost/trends)"""
+    data: list[CostTrendDataPoint]
+
+
+class ModelCostEfficiency(BaseModel):
+    """모델별 비용 효율성"""
+    model_version: str
+    avg_cost_per_request: Decimal
+    avg_quality_score: float | None
+    cost_per_quality_point: Decimal | None
+    recommendation: str | None
+
+
+class ModelCostResponse(BaseModel):
+    """모델 비용 효율성 응답 (GET /cost/models)"""
+    models: list[ModelCostEfficiency]
+
+
+class ModelPricingInfo(BaseModel):
+    """모델 가격 정보"""
+    model_name: str
+    provider: str
+    price_input_per_1m: Decimal
+    price_output_per_1m: Decimal
+    price_cached_per_1m: Decimal | None
+    context_window: int | None
+    max_output_tokens: int | None
+    is_active: bool
+    description: str | None
+
+
+class ModelPricingResponse(BaseModel):
+    """모델 가격 정보 응답 (GET /models/pricing)"""
+    models: list[ModelPricingInfo]
