@@ -41,7 +41,21 @@
       "Bash(git checkout:*)",
       "Bash(git reset:*)",
       "Bash(git commit:*)",
-      "Bash(bash:*)"
+      "Bash(bash:*)",
+      "Bash(uv:*)",
+      "Bash(docker:*)",
+      "Bash(sh)",
+      "Bash(source ~/.zshrc)",
+      "Bash(source ~/.bashrc)",
+      "Bash(~/.local/bin/uv:*)",
+      "Bash(brew --version:*)",
+      "Bash(export NVM_DIR=\"$HOME/.nvm\")",
+      "Bash([ -s \"$NVM_DIR/nvm.sh\" ])",
+      "Bash(. \"$NVM_DIR/nvm.sh\")",
+      "Bash(nvm install:*)",
+      "Bash(nvm use:*)",
+      "Bash(node --version:*)",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIiwicm9sZSI6InZpZXdlciIsImV4cCI6MTc3MDAwNzA2MSwiaWF0IjoxNzcwMDAzNDYxLCJ0eXBlIjoiYWNjZXNzIn0.wK-H77gcxkdYKULcR8b2jTUJtM0uaddZ7WBR6vxjaMM\")"
     ],
     "deny": [],
     "ask": []

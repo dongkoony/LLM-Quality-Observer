@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 LLM-Quality-Observer is a microservices-based MLOps platform for monitoring and evaluating LLM response quality. The system logs LLM interactions, evaluates them using rule-based and LLM-as-a-judge approaches, provides cost tracking and token usage monitoring, and offers dashboards for visualization and monitoring.
 
-Current status: v0.7.0 with Gateway API + Evaluator + Dashboard + Prometheus + Grafana + Cost Tracking + LiteLLM Multi-Model Support operational.
+Current status: v0.8.0 (Phase 1 완료) with Gateway API + Evaluator + Dashboard + Prometheus + Grafana + Cost Tracking + LiteLLM + **Authentication (JWT/API Key)** operational.
 
 ## Architecture
 
@@ -95,6 +95,31 @@ curl "http://localhost:18000/cost/summary"
 curl "http://localhost:18000/cost/trends?hours=24"
 curl "http://localhost:18000/cost/models?days=7"
 curl "http://localhost:18000/models/pricing"
+
+# Authentication APIs (v0.8.0+)
+# Register
+curl -X POST http://localhost:18000/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"user@example.com","username":"johndoe","password":"SecurePass1!","full_name":"John Doe"}'
+
+# Login (returns JWT token)
+curl -X POST http://localhost:18000/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"user@example.com","password":"SecurePass1!"}'
+
+# Get current user (with JWT)
+curl http://localhost:18000/auth/me \
+  -H 'Authorization: Bearer <access_token>'
+
+# Get current user (with API Key)
+curl http://localhost:18000/auth/me \
+  -H 'X-API-Key: sk-proj-...'
+
+# Create API Key
+curl -X POST http://localhost:18000/auth/api-keys \
+  -H 'Authorization: Bearer <access_token>' \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"My API Key","scopes":["chat:read","chat:write"]}'
 ```
 
 ### Dependency Management
@@ -126,6 +151,19 @@ uv sync --upgrade
 - `/cost/trends`: Time-series cost trends (v0.7.0+)
 - `/cost/models`: Model cost efficiency analysis (v0.7.0+)
 - `/models/pricing`: Model pricing information (v0.7.0+)
+- `/auth/*`: Authentication endpoints (v0.8.0+) - see below
+
+**Authentication** (`app/auth/`) - v0.8.0:
+- `POST /auth/register`: User registration
+- `POST /auth/login`: Login (JWT token issuance)
+- `POST /auth/refresh`: Token refresh
+- `POST /auth/logout`: Logout
+- `GET /auth/me`: Current user info
+- `PATCH /auth/me`: Update user info
+- `PUT /auth/me/password`: Change password
+- `GET /auth/api-keys`: List API keys
+- `POST /auth/api-keys`: Create API key
+- `DELETE /auth/api-keys/{key_id}`: Revoke API key
 
 **LLM Client** (`app/llm_client.py`) - v0.7.0:
 - Uses LiteLLM for multi-provider support (OpenAI, Anthropic, etc.)
@@ -135,14 +173,18 @@ uv sync --upgrade
 - Timing measured using `time.perf_counter()`
 - Fallback models: `FALLBACK_MODELS` config (default: ["gpt-4o-mini", "claude-haiku-4"])
 
-**Database** (`app/db.py`, `app/models.py`) - v0.7.0:
-- SQLAlchemy ORM with `LLMLog` and `LLMModelPricing` models
+**Database** (`app/db.py`, `app/models.py`) - v0.8.0:
+- SQLAlchemy ORM with `LLMLog`, `LLMModelPricing`, `User`, `APIKey`, `AuditLog` models
 - Tables auto-created on startup via `Base.metadata.create_all(bind=engine)`
 - `LLMLog` fields:
   - Base: id, created_at, user_id, prompt, response, model_version, latency_ms, status
   - Token usage (v0.7.0): input_tokens, output_tokens, total_tokens, cached_tokens, reasoning_tokens
   - Cost (v0.7.0): cost_input_usd, cost_output_usd, cost_total_usd
+  - Authentication (v0.8.0): authenticated_user_id, api_key_id
 - `LLMModelPricing` table (v0.7.0): model_name, provider, price_input_per_1m, price_output_per_1m, price_cached_per_1m, context_window, is_active, etc.
+- `User` table (v0.8.0): email, username, password_hash, role, is_active, max_requests_per_hour, max_cost_per_month_usd, etc.
+- `APIKey` table (v0.8.0): user_id, key_hash, key_prefix, name, scopes, expires_at, total_requests, etc.
+- `AuditLog` table (v0.8.0): user_id, action, resource_type, ip_address, status, etc.
 
 **Cost Calculation** (`app/cost_utils.py`) - v0.7.0:
 - `get_model_pricing(db, model_name)`: Queries pricing from database
@@ -154,6 +196,8 @@ uv sync --upgrade
 - Pydantic Settings loading from environment variables
 - Required: `DATABASE_URL`, `OPENAI_MODEL_MAIN`, `LLM_API_KEY`
 - Optional: `LLM_API_BASE_URL`, `LOG_LEVEL`, `APP_ENV`
+- JWT (v0.8.0): `JWT_SECRET_KEY`, `JWT_ALGORITHM`, `JWT_ACCESS_TOKEN_EXPIRE_MINUTES`, `JWT_REFRESH_TOKEN_EXPIRE_DAYS`
+- Auth (v0.8.0): `ENABLE_AUTHENTICATION`, `REQUIRE_AUTHENTICATION`
 
 **Metrics** (`app/metrics.py`):
 - Prometheus client integration for observability
@@ -278,6 +322,16 @@ SMTP_USERNAME=your-email@gmail.com
 SMTP_PASSWORD=your-app-password
 SMTP_FROM_EMAIL=your-email@gmail.com
 SMTP_TO_EMAILS=recipient1@example.com,recipient2@example.com
+
+# JWT Authentication (v0.8.0+)
+JWT_SECRET_KEY=your-256-bit-secret-key-here
+JWT_ALGORITHM=HS256
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES=60
+JWT_REFRESH_TOKEN_EXPIRE_DAYS=30
+
+# Authentication Settings (v0.8.0+)
+ENABLE_AUTHENTICATION=true
+REQUIRE_AUTHENTICATION=false
 ```
 
 **Important**: `.env.local` is gitignored. Each developer must create their own from the template.
@@ -335,6 +389,8 @@ Docker Compose (`infra/docker/docker-compose.local.yml`):
 - **Notifications** (v0.4.0+): Low-quality alerts sent when score ≤ `NOTIFICATION_SCORE_THRESHOLD`. Supports Slack, Discord, and Email (v0.5.0+).
 - **Metrics** (v0.5.0+): All services expose `/metrics` endpoint for Prometheus scraping. Grafana dashboard auto-provisioned at startup.
 - **Error Handling**: LLM failures are logged with status="error" but not evaluated. Only status="success" logs are processed by evaluator.
+- **Authentication** (v0.8.0+): JWT and API Key authentication available. Set `ENABLE_AUTHENTICATION=true` to enable. Set `REQUIRE_AUTHENTICATION=true` to enforce on all endpoints.
+- **Audit Logs** (v0.8.0+): All authentication actions are logged to `audit_logs` table for security tracking.
 
 ## Service Dependencies
 
@@ -346,6 +402,8 @@ gateway-api:
 - openai
 - httpx, python-dotenv
 - prometheus-client (v0.5.0+)
+- python-jose[cryptography], passlib[bcrypt], bcrypt (v0.8.0+ for auth)
+- python-multipart, email-validator (v0.8.0+ for auth)
 
 evaluator:
 - fastapi, uvicorn

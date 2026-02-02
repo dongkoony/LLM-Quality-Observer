@@ -1,8 +1,134 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, Float, Boolean, ForeignKey, DECIMAL, ARRAY
+from sqlalchemy import Column, Integer, String, Text, DateTime, Float, Boolean, ForeignKey, DECIMAL, ARRAY, BigInteger
+from sqlalchemy.dialects.postgresql import INET, JSONB
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
 from .db import Base
+
+
+# ============================================================
+# Authentication Models (v0.8.0)
+# ============================================================
+
+class User(Base):
+    """사용자 테이블 (v0.8.0)"""
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    username = Column(String(64), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=False)
+    full_name = Column(String(128), nullable=True)
+
+    # Role-Based Access Control
+    role = Column(String(32), nullable=False, default="viewer", index=True)
+    # Roles: 'admin', 'developer', 'viewer'
+
+    # Status
+    is_active = Column(Boolean, default=True)
+    is_verified = Column(Boolean, default=False)
+
+    # Limits
+    max_requests_per_hour = Column(Integer, default=1000)
+    max_cost_per_month_usd = Column(DECIMAL(10, 2), default=100.00)
+
+    # Timestamps
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+    last_login_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Metadata
+    metadata_ = Column("metadata", JSONB, default={})
+
+    # Relationships
+    api_keys = relationship("APIKey", back_populates="user", cascade="all, delete-orphan")
+    audit_logs = relationship("AuditLog", back_populates="user")
+
+
+class APIKey(Base):
+    """API Key 테이블 (v0.8.0)"""
+    __tablename__ = "api_keys"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Key information
+    key_hash = Column(String(255), unique=True, nullable=False, index=True)
+    key_prefix = Column(String(16), nullable=False)  # "sk-proj-xxxx" for display
+    name = Column(String(128), nullable=False)
+
+    # Permissions
+    scopes = Column(ARRAY(String(64)), default=["chat:read", "chat:write"])
+
+    # Status
+    is_active = Column(Boolean, default=True, index=True)
+
+    # Rate limiting
+    max_requests_per_hour = Column(Integer, default=1000)
+
+    # Usage tracking
+    last_used_at = Column(DateTime(timezone=True), nullable=True)
+    total_requests = Column(Integer, default=0)
+
+    # Expiration
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Timestamps
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    user = relationship("User", back_populates="api_keys")
+
+
+class AuditLog(Base):
+    """감사 로그 테이블 (v0.8.0)"""
+    __tablename__ = "audit_logs"
+
+    id = Column(BigInteger, primary_key=True, index=True)
+
+    # Who
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    api_key_id = Column(Integer, ForeignKey("api_keys.id", ondelete="SET NULL"), nullable=True)
+
+    # What
+    action = Column(String(64), nullable=False, index=True)
+    # Actions: 'auth.login', 'auth.logout', 'auth.register', 'chat.create',
+    #          'api_key.create', 'api_key.revoke', 'user.update'
+
+    resource_type = Column(String(64), nullable=True)  # 'chat', 'api_key', 'user'
+    resource_id = Column(Integer, nullable=True)
+
+    # When & Where
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        index=True,
+    )
+    ip_address = Column(INET, nullable=True)
+    user_agent = Column(Text, nullable=True)
+
+    # Details
+    status = Column(String(32), default="success")  # 'success', 'failure'
+    error_message = Column(Text, nullable=True)
+    metadata_ = Column("metadata", JSONB, default={})
+
+    # Relationships
+    user = relationship("User", back_populates="audit_logs")
 
 
 class LLMLog(Base):
@@ -15,9 +141,13 @@ class LLMLog(Base):
         nullable=False,
     )
 
-    user_id = Column(String(128), nullable=True)
+    user_id = Column(String(128), nullable=True)  # Legacy: 클라이언트 제공 ID
     prompt = Column(Text, nullable=False)
     response = Column(Text, nullable=False)
+
+    # Authentication (v0.8.0)
+    authenticated_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    api_key_id = Column(Integer, ForeignKey("api_keys.id", ondelete="SET NULL"), nullable=True)
 
     model_version = Column(String(64), nullable=True)
     latency_ms = Column(Float, nullable=True)

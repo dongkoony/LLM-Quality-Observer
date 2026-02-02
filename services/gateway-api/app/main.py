@@ -47,6 +47,7 @@ from .metrics import (
     record_log_saved,
 )
 from .cost_utils import get_model_pricing, calculate_cost
+from .auth import auth_router
 
 # 최초 실행 시 테이블 생성 (간단 버전)
 Base.metadata.create_all(bind=engine)
@@ -64,6 +65,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Authentication Router (v0.8.0)
+app.include_router(auth_router)
 
 
 @app.get("/health")

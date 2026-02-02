@@ -31,3 +31,4 @@ configs/env/.env.local
 # node
 node_modules/
 .next/
+services/web/dashboard/.env.local

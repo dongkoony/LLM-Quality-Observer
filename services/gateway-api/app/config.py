@@ -16,6 +16,16 @@ class Settings(BaseSettings):
 
     log_level: str = "INFO"
 
+    # JWT Authentication (v0.8.0)
+    jwt_secret_key: str = "change-this-secret-key-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_access_token_expire_minutes: int = 60
+    jwt_refresh_token_expire_days: int = 30
+
+    # Authentication settings (v0.8.0)
+    enable_authentication: bool = False
+    require_authentication: bool = False
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
