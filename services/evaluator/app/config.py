@@ -1,4 +1,6 @@
-from pydantic_settings import BaseSettings
+from functools import lru_cache
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -7,11 +9,11 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     # DB
-    database_url: str
+    database_url: str | None = None
 
     # LLM (Judge 용)
     llm_api_base_url: str | None = None
-    llm_api_key: str
+    llm_api_key: str | None = None
     openai_model_judge: str = "gpt-5-mini"
 
     # Batch Evaluation Scheduler
@@ -33,9 +35,12 @@ class Settings(BaseSettings):
     smtp_from_email: str | None = None  # 발신자 이메일
     smtp_to_emails: str | None = None  # 수신자 이메일들 (쉼표로 구분)
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+    )
 
 
-settings = Settings()
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

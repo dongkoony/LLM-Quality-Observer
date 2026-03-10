@@ -9,8 +9,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from sqlalchemy.orm import Session
 
-from .config import settings
-from .db import SessionLocal
+from .config import get_settings
+from .db import get_session_factory
 from .utils import get_pending_logs
 from .models import LLMLog, LLMEvaluation
 from .rules import basic_rule_evaluate
@@ -36,7 +36,8 @@ def run_batch_evaluation():
     """
     logger.info("Starting batch evaluation...")
 
-    db: Session = SessionLocal()
+    settings = get_settings()
+    db: Session = get_session_factory()()
     try:
         # 1. 평가 대기 중인 로그 가져오기
         pending_logs = get_pending_logs(
@@ -148,6 +149,7 @@ def start_scheduler():
     스케줄러를 시작합니다.
     """
     global scheduler
+    settings = get_settings()
 
     if not settings.enable_auto_evaluation:
         logger.info("Auto evaluation is disabled")

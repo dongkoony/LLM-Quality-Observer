@@ -21,5 +21,10 @@ dependencies = [
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[dependency-groups]
+dev = [
+  "pytest>=8.0",
+]
+
 [tool.uv]
 # uv 관련 설정 필요하면 나중에 추가

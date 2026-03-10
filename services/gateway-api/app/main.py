@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Depends, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -6,7 +8,7 @@ import math
 import time
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 
-from .db import Base, engine, get_db
+from .db import Base, get_db, get_engine
 from .models import LLMLog, LLMEvaluation, LLMModelPricing
 from .schemas import (
     ChatRequest,
@@ -39,7 +41,7 @@ from .schemas import (
     ModelPricingInfo,
 )
 from .llm_client import call_llm
-from .config import settings
+from .config import get_settings
 from .metrics import (
     MetricsMiddleware,
     record_llm_request,
@@ -48,22 +50,33 @@ from .metrics import (
 )
 from .cost_utils import get_model_pricing, calculate_cost
 
-# 최초 실행 시 테이블 생성 (간단 버전)
-Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="LLM Quality Observer - Gateway API")
+def create_app(*, testing: bool = False) -> FastAPI:
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        if not getattr(app.state, "testing", False):
+            Base.metadata.create_all(bind=get_engine())
+        yield
 
-# Prometheus 메트릭 미들웨어 추가
-app.add_middleware(MetricsMiddleware)
+    app = FastAPI(title="LLM Quality Observer - Gateway API", lifespan=lifespan)
+    app.state.testing = testing
 
-# CORS 설정 추가 (웹 대시보드에서 API 호출을 위해 필요)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Next.js dev server
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    # Prometheus 메트릭 미들웨어 추가
+    app.add_middleware(MetricsMiddleware)
+
+    # CORS 설정 추가 (웹 대시보드에서 API 호출을 위해 필요)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:3000"],  # Next.js dev server
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    return app
+
+
+app = create_app()
 
 
 @app.get("/health")
@@ -82,6 +95,7 @@ def resolve_model_version(request_model: str | None) -> str:
     요청에서 들어온 model_version이 없거나 Swagger 기본값("string")이면
     환경변수로 설정한 기본 모델(openai_model_main)을 사용한다.
     """
+    settings = get_settings()
     if not request_model or request_model == "string":
         return settings.openai_model_main
     return request_model
@@ -809,7 +823,7 @@ def get_cost_summary(
 
 @app.get("/cost/trends", response_model=CostTrendResponse)
 def get_cost_trends(
-    granularity: str = Query("hour", regex="^(hour|day|week|month)$", description="시간 단위"),
+    granularity: str = Query("hour", pattern="^(hour|day|week|month)$", description="시간 단위"),
     hours: int | None = Query(None, ge=1, le=720, description="조회할 시간 (최대 30일)"),
     days: int | None = Query(None, ge=1, le=90, description="조회할 일수 (최대 90일)"),
     db: Session = Depends(get_db),

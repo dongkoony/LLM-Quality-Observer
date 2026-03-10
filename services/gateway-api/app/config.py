@@ -1,10 +1,12 @@
-from pydantic_settings import BaseSettings
+from functools import lru_cache
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     app_env: str = "local"
 
-    database_url: str
+    database_url: str | None = None
     openai_model_main: str = "gpt-5-mini"
 
     llm_api_base_url: str | None = None
@@ -16,9 +18,12 @@ class Settings(BaseSettings):
 
     log_level: str = "INFO"
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+    )
 
 
-settings = Settings()
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

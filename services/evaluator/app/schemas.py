@@ -1,5 +1,5 @@
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class EvaluationResult(BaseModel):
@@ -14,5 +14,4 @@ class EvaluationResult(BaseModel):
     judge_model: str = Field(default="rule-basic-v1", description="평가에 사용된 모델/룰 버전")
     comment: Optional[str] = Field(default=None, description="평가 근거 또는 코멘트")
 
-    class Config:
-        from_attributes = True  # Pydantic v2에서 ORM 모드 활성화
+    model_config = ConfigDict(from_attributes=True)
