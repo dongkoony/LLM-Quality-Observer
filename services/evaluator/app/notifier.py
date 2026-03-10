@@ -11,7 +11,7 @@ import aiosmtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-from .config import settings
+from .config import get_settings
 from .models import LLMLog, LLMEvaluation
 from .metrics import record_notification, record_low_quality_alert
 
@@ -29,6 +29,8 @@ def send_slack_notification(message: str, notification_type: str = "alert") -> b
     Returns:
         bool: 전송 성공 여부
     """
+    settings = get_settings()
+
     if not settings.slack_webhook_url:
         logger.debug("Slack webhook URL이 설정되지 않았습니다.")
         return False
@@ -61,6 +63,8 @@ def send_discord_notification(message: str, notification_type: str = "alert") ->
     Returns:
         bool: 전송 성공 여부
     """
+    settings = get_settings()
+
     if not settings.discord_webhook_url:
         logger.debug("Discord webhook URL이 설정되지 않았습니다.")
         return False
@@ -95,6 +99,8 @@ async def send_email_notification(subject: str, message: str, notification_type:
     Returns:
         bool: 전송 성공 여부
     """
+    settings = get_settings()
+
     if not all([
         settings.smtp_host,
         settings.smtp_username,
@@ -154,6 +160,8 @@ def send_low_quality_alert(log: LLMLog, evaluation: LLMEvaluation):
         log: LLM 로그
         evaluation: 평가 결과
     """
+    settings = get_settings()
+
     if evaluation.overall_score >= settings.notification_score_threshold:
         # 임계값 이상이면 알림 안 보냄
         return

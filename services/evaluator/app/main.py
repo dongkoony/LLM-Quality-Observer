@@ -6,15 +6,17 @@ import logging
 import time
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 
-from .db import Base, engine, get_db
+from .db import Base, get_db, get_engine
 from .models import LLMLog, LLMEvaluation
 from .rules import basic_rule_evaluate
 from .llm_judge import run_judge
-from .config import settings
+from .config import get_settings
 from .scheduler import start_scheduler, stop_scheduler
 from .utils import get_pending_logs
 from .metrics import record_evaluation, update_pending_logs_count
 from .notifier import send_low_quality_alert
+
+settings = get_settings()
 
 # 로깅 설정
 logging.basicConfig(
@@ -24,29 +26,33 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """
-    FastAPI 앱의 수명 주기 관리.
-    시작 시 테이블 생성 및 스케줄러 시작, 종료 시 스케줄러 중지.
-    """
-    # Startup
-    logger.info("Starting Evaluator Service...")
-    Base.metadata.create_all(bind=engine)
-    start_scheduler()
-    yield
-    # Shutdown
-    logger.info("Stopping Evaluator Service...")
-    stop_scheduler()
+def create_app(*, testing: bool = False) -> FastAPI:
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        """
+        FastAPI 앱의 수명 주기 관리.
+        시작 시 테이블 생성 및 스케줄러 시작, 종료 시 스케줄러 중지.
+        """
+        if not getattr(app.state, "testing", False):
+            logger.info("Starting Evaluator Service...")
+            Base.metadata.create_all(bind=get_engine())
+            start_scheduler()
+        yield
+        if not getattr(app.state, "testing", False):
+            logger.info("Stopping Evaluator Service...")
+            stop_scheduler()
+
+    app = FastAPI(
+        title="LLM Quality Observer - Evaluator Service",
+        description="룰 기반 및 LLM-as-a-judge 방식으로 LLM 응답 품질을 평가하는 서비스",
+        version="1.0.0",
+        lifespan=lifespan,
+    )
+    app.state.testing = testing
+    return app
 
 
-# FastAPI 앱 생성
-app = FastAPI(
-    title="LLM Quality Observer - Evaluator Service",
-    description="룰 기반 및 LLM-as-a-judge 방식으로 LLM 응답 품질을 평가하는 서비스",
-    version="1.0.0",
-    lifespan=lifespan,
-)
+app = create_app()
 
 
 @app.get("/health")
@@ -57,7 +63,7 @@ def health_check():
     """
     return {
         "status": "ok",
-        "env": settings.app_env,
+        "env": get_settings().app_env,
     }
 
 
@@ -93,6 +99,7 @@ def evaluate_once(
     pending_logs = get_pending_logs(db, limit=limit)
 
     if not pending_logs:
+        settings = get_settings()
         return {
             "evaluated": 0,
             "judge_type": judge_type,
@@ -102,6 +109,7 @@ def evaluate_once(
     # 2. 각 로그에 대해 평가 수행
     evaluated_count = 0
     judge_model_name = ""
+    settings = get_settings()
 
     for log in pending_logs:
         try:

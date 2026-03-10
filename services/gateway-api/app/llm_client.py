@@ -2,12 +2,17 @@ import time
 import os
 from litellm import completion
 
-from .config import settings
+from .config import get_settings
 
-# LiteLLM 설정
-os.environ["OPENAI_API_KEY"] = settings.llm_api_key or ""
-if settings.llm_api_base_url:
-    os.environ["OPENAI_API_BASE"] = settings.llm_api_base_url
+
+def _configure_provider_env() -> None:
+    settings = get_settings()
+
+    if settings.llm_api_key:
+        os.environ["OPENAI_API_KEY"] = settings.llm_api_key
+
+    if settings.llm_api_base_url:
+        os.environ["OPENAI_API_BASE"] = settings.llm_api_base_url
 
 
 def _resolve_model(model_version: str | None) -> str:
@@ -15,6 +20,8 @@ def _resolve_model(model_version: str | None) -> str:
     요청에서 온 model_version이 이상하면 무시하고
     기본 모델(openai_model_main)을 쓰도록 정리.
     """
+    settings = get_settings()
+
     if not model_version:
         return settings.openai_model_main
 
@@ -43,8 +50,11 @@ def call_llm(prompt: str, model_version: str | None = None) -> dict:
             }
         }
     """
+    settings = get_settings()
+    _configure_provider_env()
+
     model = _resolve_model(model_version)
-    models_to_try = [model] + settings.fallback_models
+    models_to_try = list(dict.fromkeys([model, *settings.fallback_models]))
 
     last_error = None
 

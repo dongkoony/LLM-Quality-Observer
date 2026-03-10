@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class ChatRequest(BaseModel):
@@ -44,8 +44,7 @@ class LLMLogRead(BaseModel):
     latency_ms: float | None
     status: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Dashboard API Schemas
@@ -69,8 +68,7 @@ class LogListItem(BaseModel):
     latency_ms: float | None
     status: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LogListResponse(BaseModel):
@@ -100,8 +98,7 @@ class EvaluationRead(BaseModel):
     log_response: str | None = None
     log_model_version: str | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class EvaluationListResponse(BaseModel):

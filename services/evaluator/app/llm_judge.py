@@ -1,6 +1,7 @@
 import json
 import textwrap
 import time
+from functools import lru_cache
 from typing import TypedDict
 
 from fastapi import HTTPException
@@ -12,7 +13,7 @@ from openai import (
     AuthenticationError,
 )
 
-from .config import settings
+from .config import get_settings
 from .models import LLMLog
 
 
@@ -24,10 +25,19 @@ class EvaluationResult(TypedDict):
     raw_judge_response: str
 
 
-client = OpenAI(
-    api_key=settings.llm_api_key,
-    base_url=settings.llm_api_base_url or None,
-)
+@lru_cache
+def get_client() -> OpenAI:
+    settings = get_settings()
+    if not settings.llm_api_key:
+        raise HTTPException(
+            status_code=500,
+            detail="LLM_API_KEY is required for LLM judge evaluation.",
+        )
+
+    return OpenAI(
+        api_key=settings.llm_api_key,
+        base_url=settings.llm_api_base_url or None,
+    )
 
 
 def build_evaluation_prompt(log: LLMLog) -> str:
@@ -110,7 +120,9 @@ def run_judge(log: LLMLog) -> EvaluationResult:
     """
     하나의 LLMLog에 대해 Judge LLM을 호출하고 EvaluationResult 반환.
     """
+    settings = get_settings()
     prompt = build_evaluation_prompt(log)
+    client = get_client()
 
     try:
         start = time.perf_counter()
