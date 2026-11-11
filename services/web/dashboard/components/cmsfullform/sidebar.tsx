@@ -216,7 +216,9 @@ export default function Sidebar() {
         }}
         title={menuState === "collapsed" && !isHovered && !isMobile ? item.label : undefined}
       >
-        <item.icon className="h-4 w-4 flex-shrink-0 sidebar-menu-icon" />
+        {item.icon && (
+          <item.icon className="h-4 w-4 flex-shrink-0 sidebar-menu-icon" />
+        )}
 
         {showText && (
           <>
